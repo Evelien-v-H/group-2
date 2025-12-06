@@ -187,18 +187,40 @@ class small_molecule:
         return RDkit_array
 
 
-class proteins:
-    def __init__(self, uniprot_id):
+class protein:
+    def __init__(self, uniprot_id, document):
         self.uniprot_id = uniprot_id
+        self.document=document
 
     def extract_sequence(self):
-        #Voor Iris: hier kan jouw extract_sequence ding komen
+        """no input but the document earlier made shoudl be in the format of:
+        first the uniprot-id, second the proteinacronym and last the one
+        letter code sequence of the protein, split by comma's. the first
+        line is to tell, which column is which. the output is a dictionary,
+        with as keys the uniprotid and as value the one letter code 
+        sequence of the protein."""
+        file=open(self.document) #document needs to be in the right format
+        lines=file.readlines()
+        lines.pop(0)
+        file.close()
+        uniprot_dict={}
+        for line in lines: 
+            uniprot_id,protein_acronym,protein_sequence=line.split(",")
+            uniprot_id=uniprot_id.replace('"','')
+            protein_sequence=protein_sequence.strip().replace('"','')
+            uniprot_dict[uniprot_id]=protein_sequence
+        return uniprot_dict
 
-    def 
+    def uniprot2sequence(self):
+        """no input, returns a string with the protein one letter code sequence"""
+        uniprot_dict=self.extract_sequence()
+        sequence=uniprot_dict[self.uniprot_id]
+        return sequence #returns one letter code sequence of the protein
+    
+
 
 SMILES,UNIProt_ID,affinityscore=splitting_data_training('data/train.csv')
 SMILE=SMILES[0]
-
 
 for i in SMILES:
     Molecule=small_molecule(i)
