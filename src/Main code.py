@@ -186,9 +186,18 @@ class small_molecule:
         RDkit_array=np.array([number_of_aromatic_rings,formal_charge,mol_weight,logp,hbonds_donors,hbonds_acceptors,polar_surface_area,rotatable_bonds,topological_fingerprint,morganfingerprint,macckey])
         return RDkit_array
 
+
+class proteins:
+    def __init__(self, uniprot_id):
+        self.uniprot_id = uniprot_id
+
+    def extract_sequence(self):
+        #Voor Iris: hier kan jouw extract_sequence ding komen
+
+    def 
+
 SMILES,UNIProt_ID,affinityscore=splitting_data_training('data/train.csv')
 SMILE=SMILES[0]
-
 
 
 for i in SMILES:
