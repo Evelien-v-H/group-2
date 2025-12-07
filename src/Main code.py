@@ -7,6 +7,8 @@ from rdkit import DataStructs
 from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
 
+import peptidy as pep
+
 #relevant parts of rd_kit
 
 #We need to implement this
@@ -204,11 +206,13 @@ class protein:
         lines.pop(0)
         file.close()
         uniprot_dict={}
+
         for line in lines: 
             uniprot_id,protein_acronym,protein_sequence=line.split(",")
             uniprot_id=uniprot_id.replace('"','')
             protein_sequence=protein_sequence.strip().replace('"','')
             uniprot_dict[uniprot_id]=protein_sequence
+
         return uniprot_dict
 
     def uniprot2sequence(self):
@@ -217,6 +221,13 @@ class protein:
         sequence=uniprot_dict[self.uniprot_id]
         return sequence #returns one letter code sequence of the protein
     
+    def sequence2onehot(self,sequence):
+        """input is the sequence of a protein in one letter code. Returns a 
+        list with the encoded peptide sequence represented as one-hot encoded
+        vector."""
+        onehot=pep.one_hot_encoding(sequence,822)
+        return onehot
+        
 
 
 SMILES,UNIProt_ID,affinityscore=splitting_data_training('data/train.csv')
