@@ -19,3 +19,5 @@ def extract_sequence(document):
 
 data_dict=extract_sequence("data/protein_info.csv")
 print(len(data_dict.keys()))
+print(len(max(data_dict.values())))
+print(len(min(data_dict.values())))
