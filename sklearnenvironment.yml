@@ -136,5 +136,9 @@ dependencies:
   - zlib-ng=2.2.5=h32d8bfd_0
   - zstd=1.5.7=hbeecb71_2
   - pip:
+      - joblib==1.5.2
       - peptidy==0.0.1
+      - scikit-learn==1.7.2
+      - scipy==1.16.3
+      - threadpoolctl==3.6.0
 prefix: C:\Users\20241252\.conda\envs\rdkit_env
