@@ -21,7 +21,7 @@ def open_data(datafile):
     return df
 
 
-def splitting_data_training(datafile):
+def data_training(datafile):
     """This function splits the dataset in a SMILES array, UNIProt_ID and a affinity score. 
         
         input: a csv file like the given trainingset. The first colom is the SMILES-string, the second colom is the UNIProt_ID and the third 
