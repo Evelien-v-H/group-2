@@ -7,3 +7,6 @@ matrix=np.vstack([array1,array2])
 print(matrix)
 matrix=np.vstack([matrix,array3])
 print(matrix)
+
+array=np.concatenate((array1,array2))
+print(array)
