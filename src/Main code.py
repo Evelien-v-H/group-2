@@ -8,6 +8,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
 
 import peptidy as pep
+from peptidy import descriptors
 import sklearn
 
 #Openen data:
@@ -21,7 +22,7 @@ def open_data(datafile):
     return df
 
 
-def data_training(datafile):
+def data_training_splitting(datafile):
     """This function splits the dataset in a SMILES array, UNIProt_ID and a affinity score. 
         
         input: a csv file like the given trainingset. The first colom is the SMILES-string, the second colom is the UNIProt_ID and the third 
@@ -34,10 +35,17 @@ def data_training(datafile):
     affinity=df.iloc[:,2].to_numpy()
     return SMILES,UNIProt_ID,affinity
 
+def data_test_splitting(datafile):
+    """This function splits the dataset in a SMILES array, UNIProt_ID and a affinity score. 
+        
+        input: a csv file like the given testset. The first colom is the SMILES-string and the second colom is the UNIProt_ID
+        
+        Output: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore"""
+    df=open_data(datafile)
+    SMILES=df.iloc[:,0].to_numpy()
+    UNIProt_ID=df.iloc[:,1].to_numpy()
+    return SMILES,UNIProt_ID
 
-
-#Opmerkingen voor het inleveren van de code:
-    #RDkit moet nog het stukje aanvullen 2X worden weggehaald
 class small_molecule:
     def __init__(self,SMILES):
         self.SMILES=str(SMILES)
@@ -67,7 +75,7 @@ class protein:
         letter code sequence of the protein, split by comma's. the first
         line is to tell, which column is which. the output is a dictionary,
         with as keys the uniprotid and as value the one letter code 
-        sequence of the protein."""
+        sequence of the protein. (For this project it is the protein_info.csv)"""
         file=open(self.document) #document needs to be in the right format
         lines=file.readlines()
         lines.pop(0)
@@ -165,3 +173,65 @@ def RF_error(model, X_test, y_test):
     model, an array X_test and an array y_test. the output is a error
     as a float."""
     return model.score(X_test,y_test)
+        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
+        peptidy_features_list = list(peptidy_features_dict.values())
+        return peptidy_features_list
+    
+def combining_all_features_training(datafile):
+    """This functions makes an matrix with the descriptors from the ligands and proteins in the file
+    
+    Input: csv-file with a format of the trainingsset (colom 1:SMILES, colom 2:UNIProt_ID, colom 3:affinity)
+    
+    Output: matrix (samples*features)
+    """
+    SMILES,UNIProt_ID,affinity=data_training_splitting(datafile)
+
+    for i in range (len(SMILES)):
+        ligand=small_molecule(SMILES[i])
+        ligand_features=ligand.rdkit_descriptor()
+
+        peptide=protein(UNIProt_ID[i],'data/protein_info.csv' )
+        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
+        peptide_features=np.array(peptide_features_list)
+        all_features=np.concatenate((ligand_features, peptide_features))
+
+        if i==0:
+            matrix=all_features
+        
+        else:
+            matrix=np.vstack((matrix,all_features))
+
+    
+    return matrix
+
+def combining_all_features_test(datafile):
+    """This functions makes an matrix with the descriptors from the ligands and proteins in the file
+    
+    Input: csv-file with a format of the testset (colom 1:SMILES, colom 2:UNIProt_ID)
+    
+    Output: matrix (samples*features)
+    """
+    SMILES,UNIProt_ID=data_test_splitting(datafile)
+
+    for i in range (len(SMILES)):
+        ligand=small_molecule(SMILES[i])
+        ligand_features=ligand.rdkit_descriptor()
+
+        peptide=protein(UNIProt_ID[i],'data/protein_info.csv' )
+        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
+        peptide_features=np.array(peptide_features_list)
+        
+        all_features=np.concatenate((ligand_features, peptide_features))
+
+
+        if i==0:
+            matrix=all_features
+        
+        else:
+            matrix=np.vstack(matrix,all_features)
+    
+    return matrix
+
+print(combining_all_features_training('data/train.csv'))
+
+
