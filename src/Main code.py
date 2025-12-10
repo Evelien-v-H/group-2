@@ -102,3 +102,66 @@ class protein:
         peptidy_features_dict.pop('molecular_formula')          #This is the only non-numerical feature and is not useful
         peptidy_features_list = peptidy_features_dict.values()
         return peptidy_features_list
+
+
+def splittingdata(X_train, y_train, percentage):
+    """This function splits the data randomly into training data set and a validation
+    data set. These training and validation set are returned as a tuple of 2 tuples
+    as (X_training,y_training),(X_validation, y_validation). It splits the the data in
+    two with the percentage to determine how big training data set is. Percentage is
+    a float between 1 and 0."""
+    import numpy as np
+    import random
+
+    #calculates trainingsize with percentage
+    samples, features= X_train.shape
+    training_size=int(percentage*samples)
+
+    #permutation makes a random order so data
+    #is split randomly.
+    permutation=np.random.permutation(samples)
+
+    #shuffles data with permutation
+    X_shuffled=X_train[permutation]
+    y_shuffled=y_train[permutation]
+
+    #makes the training and validation sets
+    X_training=X_shuffled[:training_size]
+    X_validation=X_shuffled[training_size:]
+    y_training=y_shuffled[:training_size]
+    y_validation=y_shuffled[training_size:]
+
+    training=(X_training,y_training)
+    validation=(X_validation,y_validation)
+
+    return training,validation
+
+def set_scaling(X):
+    """makes the scaler, from given data set X. the scaler used
+    is a minmax scaler. it returns a object with a fixed scaler"""
+    scaler=sklearn.preprocessing.MinMaxScaler()
+    return scaler.fix(X)
+
+def data_scaling(scaler, X):
+    """transforms data from fixed scalar. input is the fixed scaler
+    and the data that need to be scaled. the output is th scaled data"""
+    return scaler.transform(X)
+
+def RF_fitting(X_train, y_train):
+    """fits a random forest to a X_train and a y_train. input is a
+    dataset with X_train and y_train in an array. output is the fitted
+    model of the randomforest."""
+    model= sklearn.ensemble.RandomForestRegressor()
+    return model.fit(X_train,y_train)
+
+def RF_predict(model, X_test):
+    """uses a defined model to predict the y values of X_test. input
+    is an array X_test and the defined model. output is an array of 
+    the predicted y values"""
+    return model.predict(X_test)
+
+def RF_error(model, X_test, y_test):
+    """uses R2 to calculate the error of the model. input is a defined
+    model, an array X_test and an array y_test. the output is a error
+    as a float."""
+    return model.score(X_test,y_test)
