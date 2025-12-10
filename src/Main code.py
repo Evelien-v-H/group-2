@@ -8,7 +8,10 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
 
 import peptidy as pep
+
 import sklearn
+from sklearn.ensemble import RandomForestRegressor
+
 
 #Openen data:
 def open_data(datafile):
@@ -102,3 +105,14 @@ class protein:
         peptidy_features_dict.pop('molecular_formula')          #This is the only non-numerical feature and is not useful
         peptidy_features_list = peptidy_features_dict.values()
         return peptidy_features_list
+
+
+def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
+    #ja er komt een uitleg wat alles is en ik ga nog selecteren wat relevant is
+    random_forest=RandomForestRegressor(n_estimators,  criterion, max_depth, min_samples_split, min_samples_leaf, 
+                min_weight_fraction_leaf, max_features, max_leaf_nodes, min_impurity_decrease, bootstrap, 
+                oob_score, n_jobs, random_state, verbose, warm_start, ccp_alpha, max_samples, monotonic_cst)
+    random_forest.fit(X,y)
+    return random_forest
