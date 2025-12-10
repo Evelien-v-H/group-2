@@ -8,7 +8,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
 
 import peptidy as pep
-
+import sklearn
 
 #Openen data:
 def open_data(datafile):
