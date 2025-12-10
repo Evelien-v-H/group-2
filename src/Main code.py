@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 from rdkit import Chem
 from rdkit.Chem import Descriptors, Lipinski, Crippen, rdMolDescriptors
@@ -227,6 +228,23 @@ def combining_all_features_test(datafile):
             matrix=np.vstack(matrix,all_features)
     
     return matrix
+
+def fit_PCA(X, n_components):
+    """performs a PCA on the data in X (np.array) and returns the features transformed onto the principal component feature space as X_reduced (np.array)"""
+    X_reduced = sklearn.decomposition.PCA(n_components=n_components).fit_transform(X)
+    return X_reduced
+
+def plot_PCA(X_reduced, y, component1, component2):
+    """makes a PCA scatterplot with on the horizontal axis component1 and component2. 
+    Parameters: 
+        X_reduced (np.array): all data transformed onto the feature space of the principle components.
+        component1 (int): index of principal component to be plotted on horizontal axis
+        component2 (int): index of principal component to be plotted on vertical axis
+     """
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    scatter = ax.scatter(X_reduced[:,component1], X_reduced[:,component2], c=y)
+    plt.show()
 
 print(combining_all_features_training('data/train.csv'))
 
