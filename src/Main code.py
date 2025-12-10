@@ -8,6 +8,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
 
 import peptidy as pep
+from peptidy import descriptors
 import sklearn
 
 #Openen data:
@@ -95,7 +96,7 @@ class protein:
     def extract_features(self, sequence):
         """extracts the protein features from the amino acid sequence using peptidy. 
         Returns a list of all numerical features from peptidy of this protein"""
-        peptidy_features_dict = pep.compute_descriptors(sequence, descriptor_names=None, pH=7)
+        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
         peptidy_features_dict.pop('molecular_formula')          #This is the only non-numerical feature and is not useful
         peptidy_features_list = peptidy_features_dict.values()
         return peptidy_features_list
