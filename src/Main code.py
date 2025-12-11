@@ -47,8 +47,8 @@ def data_test_splitting(datafile):
         
         Output: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore"""
     df=open_data(datafile)
-    SMILES=df.iloc[:,0].to_numpy()
-    UNIProt_ID=df.iloc[:,1].to_numpy()
+    SMILES=df.iloc[:,1].to_numpy()
+    UNIProt_ID=df.iloc[:,2].to_numpy()
     return SMILES,UNIProt_ID
 
 def extract_sequence(document):
@@ -121,10 +121,9 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
     #ja er komt een uitleg wat alles is en ik ga nog selecteren wat relevant is, dit zijn de standaard waarde van de makers van het model
     #Ik kan doordat ik dit tijdens de datacombinatie gaan doen omdat ik daar errors had nu niet de X,y die daaruit komt gebruiken dus die eventuele errors zal ik nog op moeten lossen
-    #Welke input heeft de predict functie nodig @Iris
 
     #n_estimators is het aantal bomen dat je wilt gaan gebruiken, dit lijkt mij relevant
-    #criterion, dit is de Loss functie die je gebruikt om op zoek te gaan naar de beste boom, @Iris welke gebruik jij?
+    #criterion, dit is de Loss functie die je gebruikt om op zoek te gaan naar de beste boom,
     #Max_depth De maximum depth van de boom, je kan dus ook het maximum qua aantal takken voorstellen. Dit is iets anders dan de minimum aantal samples per afsplitsing. Dit is een hyperparameter die we uit zullen moeten gaan testen
     #min_samples_split minimaal aantal samples per split, dit is een hyperparameter die we sws moeten gaan testen
     #min_samples_leaf, minimaal aantal samples die nodig zijn bij een leaf node, dus met hoeveel je uiteindelijk een keus maakt --> ook testen
@@ -137,7 +136,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     #max_samples --> kan relevant zijn, maar ik zou dit niet als eerste testen, als je het niet test is dat denk ik ook prima
 
     #min_weight_fraction_leaf --> is een andere methode van het aantal uiteindelijk samples bepalen, hoeft niet uitgetest te worden
-    #max_leaf_nodes wordt gekeken naar hoeveel leafs er maximaal zijn, kan je denk ik beter met adere features doen
+    #max_leaf_nodes wordt gekeken naar hoeveel leafs er maximaal zijn, kan je denk ik beter met andere features doen
     #min_impurity_decrease, de minimale verbetering --> ik denk dat dit heel lastig is, voorkomt miss overfitting, maar ik denk dat dit te veel extra is
     #n_jobs, hij gaat dan meerdere dingen tegelijk doen, is denk ik niet heel relevant
     #verbose, niet heel nuttig geeft je eventueel meer inzicht over hoever die is
@@ -240,8 +239,7 @@ def combining_all_features_training(datafile):
         else:
             matrix=np.vstack((matrix,all_features))
 
-    affinity = np.array(affinity)
-    return matrix, affinity
+    return matrix
 
 def combining_all_features_test(datafile):
     """This functions makes an matrix with the descriptors from the ligands and proteins in the file
@@ -252,6 +250,7 @@ def combining_all_features_test(datafile):
     """
     SMILES,UNIProt_ID=data_test_splitting(datafile)
     uniprot_dict=extract_sequence("data/protein_info.csv")
+    print(SMILES,UNIProt_ID)
     for i in range(len(SMILES)):
         ligand=small_molecule(SMILES[i])
         ligand_features=ligand.rdkit_descriptor()
@@ -267,7 +266,7 @@ def combining_all_features_test(datafile):
             matrix=all_features
         
         else:
-            matrix=np.vstack(matrix,all_features)
+            matrix=np.vstack((matrix,all_features))
     
     return matrix
 
@@ -330,3 +329,21 @@ print("file is made with predictions")
 endtime=time.time()
 print("the model is trained en data is predicted")
 print("this took " + endtime-starttime + "seconds")
+
+
+def data_cleaning(data):
+    """Input data matrix"""
+    
+    for i in range(data.shape[1]):
+        print('b')
+        for j in range(data.shape[0]):
+            if isinstance(data[j, i], (float, int)) and not np.isnan(data[j,i]):
+                if 0==1:
+                    print('a')
+            else:
+                print(j,i)
+                print(data[j,i])
+                
+                
+
+
