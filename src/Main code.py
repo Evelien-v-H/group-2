@@ -14,6 +14,7 @@ from peptidy import descriptors
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
 
+import time
 
 #Openen data:
 def open_data(datafile):
@@ -50,6 +51,27 @@ def data_test_splitting(datafile):
     UNIProt_ID=df.iloc[:,1].to_numpy()
     return SMILES,UNIProt_ID
 
+def extract_sequence(document):
+    """input is a doc but the document earlier made should be in the format of:
+    first the uniprot-id, second the proteinacronym and last the one
+    letter code sequence of the protein, split by comma's. the first
+    line is to tell, which column is which. the output is a dictionary,
+    with as keys the uniprotid and as value the one letter code 
+    sequence of the protein. (For this project it is the protein_info.csv)"""
+    file=open(document) #document needs to be in the right format
+    lines=file.readlines()
+    lines.pop(0)
+    file.close()
+    uniprot_dict={}
+
+    for line in lines: 
+        uniprot_id,protein_acronym,protein_sequence=line.split(",")
+        uniprot_id=uniprot_id.replace('"','')
+        protein_sequence=protein_sequence.strip().replace('"','')
+        uniprot_dict[uniprot_id]=protein_sequence
+
+    return uniprot_dict
+
 class small_molecule:
     def __init__(self,SMILES):
         self.SMILES=str(SMILES)
@@ -69,34 +91,13 @@ class small_molecule:
 
     
 class protein:
-    def __init__(self, uniprot_id, document):
+    def __init__(self, uniprot_id, dict):
         self.uniprot_id = uniprot_id
-        self.document=document
-
-    def extract_sequence(self):
-        """no input but the document earlier made should be in the format of:
-        first the uniprot-id, second the proteinacronym and last the one
-        letter code sequence of the protein, split by comma's. the first
-        line is to tell, which column is which. the output is a dictionary,
-        with as keys the uniprotid and as value the one letter code 
-        sequence of the protein. (For this project it is the protein_info.csv)"""
-        file=open(self.document) #document needs to be in the right format
-        lines=file.readlines()
-        lines.pop(0)
-        file.close()
-        uniprot_dict={}
-
-        for line in lines: 
-            uniprot_id,protein_acronym,protein_sequence=line.split(",")
-            uniprot_id=uniprot_id.replace('"','')
-            protein_sequence=protein_sequence.strip().replace('"','')
-            uniprot_dict[uniprot_id]=protein_sequence
-
-        return uniprot_dict
+        self.dictionary=dict
 
     def uniprot2sequence(self):
         """no input, returns a string with the protein one letter code sequence"""
-        uniprot_dict=self.extract_sequence()
+        uniprot_dict=self.dictionary
         sequence=uniprot_dict[self.uniprot_id]
         return sequence #returns one letter code sequence of the protein
     
@@ -109,10 +110,9 @@ class protein:
     
     def extract_features(self, sequence):
         """extracts the protein features from the amino acid sequence using peptidy. 
-        Returns a list of all numerical features from peptidy of this protein"""
-        peptidy_features_dict = pep.compute_descriptors(sequence, descriptor_names=None, pH=7)
-        peptidy_features_dict.pop('molecular_formula')          #This is the only non-numerical feature and is not useful
-        peptidy_features_list = peptidy_features_dict.values()
+        Returns a list of all numerical features from peptidy of this protein"""    
+        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
+        peptidy_features_list = list(peptidy_features_dict.values())
         return peptidy_features_list
 
 
@@ -153,13 +153,6 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
                                                         ccp_alpha=ccp_alpha, max_samples=max_samples, monotonic_cst=monotonic_cst)
     random_forest.fit(X,y)
     return random_forest
-
-def extract_features(self, sequence):
-    """extracts the protein features from the amino acid sequence using peptidy. 
-    Returns a list of all numerical features from peptidy of this protein"""    
-    peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
-    peptidy_features_list = list(peptidy_features_dict.values())
-    return peptidy_features_list
 
 
 def splittingdata(X_train, y_train, percentage):
@@ -232,11 +225,12 @@ def combining_all_features_training(datafile):
     Output: matrix (n_samples*n_features) and affinity (np.array of length n_samples)
     """
     SMILES,UNIProt_ID,affinity=data_training_splitting(datafile)
+    uniprot_dict=extract_sequence("data/protein_info.csv")
     for i in range(len(SMILES)):
         ligand=small_molecule(SMILES[i])
         ligand_features=ligand.rdkit_descriptor()
 
-        peptide=protein(UNIProt_ID[i],'data/protein_info.csv' )
+        peptide=protein(UNIProt_ID[i], uniprot_dict)
         peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
         peptide_features=np.array(peptide_features_list)
         all_features=np.concatenate((ligand_features, peptide_features))
@@ -257,12 +251,12 @@ def combining_all_features_test(datafile):
     Output: matrix (samples*features)
     """
     SMILES,UNIProt_ID=data_test_splitting(datafile)
-
+    uniprot_dict=extract_sequence("data/protein_info.csv")
     for i in range(len(SMILES)):
         ligand=small_molecule(SMILES[i])
         ligand_features=ligand.rdkit_descriptor()
 
-        peptide=protein(UNIProt_ID[i],'data/protein_info.csv' )
+        peptide=protein(UNIProt_ID[i],uniprot_dict)
         peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
         peptide_features=np.array(peptide_features_list)
         
@@ -314,3 +308,25 @@ def run_model():
             highest_cv_score = mean_cv_score
             best_data_source = data_source
     return best_data_source
+
+def kaggle_submission(X_test,model,filename):
+    affinity_array=RF_predict(model, X_test)
+    f=open(filename,'w')
+    f.write("id,affinity_score/n")
+    for a in affinity_array:
+        f.write(a+"/n")
+    f.close()
+    return
+
+starttime=time.time()
+print("started")
+X,y=combining_all_features_training("data/train.csv")
+X_test=combining_all_features_test("data/test.csv")
+print("data is prepared")
+model=train_model(X,y)
+print("model is trained")
+kaggle_submission(X_test,model,"docs/Kaggle_submission.txt")
+print("file is made with predictions")
+endtime=time.time()
+print("the model is trained en data is predicted")
+print("this took " + endtime-starttime + "seconds")
