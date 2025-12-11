@@ -110,9 +110,8 @@ class protein:
     def extract_features(self, sequence):
         """extracts the protein features from the amino acid sequence using peptidy. 
         Returns a list of all numerical features from peptidy of this protein"""
-        peptidy_features_dict = pep.compute_descriptors(sequence, descriptor_names=None, pH=7)
-        peptidy_features_dict.pop('molecular_formula')          #This is the only non-numerical feature and is not useful
-        peptidy_features_list = peptidy_features_dict.values()
+        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
+        peptidy_features_list = list(peptidy_features_dict.values())
         return peptidy_features_list
 
 
@@ -314,3 +313,14 @@ def run_model():
             highest_cv_score = mean_cv_score
             best_data_source = data_source
     return best_data_source
+
+print(combining_all_features_training('data/train.csv'))
+
+def data_cleaning(data):
+    """Input data matrix"""
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            if data[i,j] is not float and data[i,j] is not int:
+                raise ValueError("You have a wrong kind of structure in your matrix")
+
+data_cleaning(combining_all_features_training('data/train.csv'))
