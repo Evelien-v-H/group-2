@@ -110,9 +110,8 @@ class protein:
     def extract_features(self, sequence):
         """extracts the protein features from the amino acid sequence using peptidy. 
         Returns a list of all numerical features from peptidy of this protein"""
-        peptidy_features_dict = pep.compute_descriptors(sequence, descriptor_names=None, pH=7)
-        peptidy_features_dict.pop('molecular_formula')          #This is the only non-numerical feature and is not useful
-        peptidy_features_list = peptidy_features_dict.values()
+        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
+        peptidy_features_list = list(peptidy_features_dict.values())
         return peptidy_features_list
 
 
@@ -121,10 +120,9 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
     #ja er komt een uitleg wat alles is en ik ga nog selecteren wat relevant is, dit zijn de standaard waarde van de makers van het model
     #Ik kan doordat ik dit tijdens de datacombinatie gaan doen omdat ik daar errors had nu niet de X,y die daaruit komt gebruiken dus die eventuele errors zal ik nog op moeten lossen
-    #Welke input heeft de predict functie nodig @Iris
 
     #n_estimators is het aantal bomen dat je wilt gaan gebruiken, dit lijkt mij relevant
-    #criterion, dit is de Loss functie die je gebruikt om op zoek te gaan naar de beste boom, @Iris welke gebruik jij?
+    #criterion, dit is de Loss functie die je gebruikt om op zoek te gaan naar de beste boom,
     #Max_depth De maximum depth van de boom, je kan dus ook het maximum qua aantal takken voorstellen. Dit is iets anders dan de minimum aantal samples per afsplitsing. Dit is een hyperparameter die we uit zullen moeten gaan testen
     #min_samples_split minimaal aantal samples per split, dit is een hyperparameter die we sws moeten gaan testen
     #min_samples_leaf, minimaal aantal samples die nodig zijn bij een leaf node, dus met hoeveel je uiteindelijk een keus maakt --> ook testen
@@ -137,7 +135,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     #max_samples --> kan relevant zijn, maar ik zou dit niet als eerste testen, als je het niet test is dat denk ik ook prima
 
     #min_weight_fraction_leaf --> is een andere methode van het aantal uiteindelijk samples bepalen, hoeft niet uitgetest te worden
-    #max_leaf_nodes wordt gekeken naar hoeveel leafs er maximaal zijn, kan je denk ik beter met adere features doen
+    #max_leaf_nodes wordt gekeken naar hoeveel leafs er maximaal zijn, kan je denk ik beter met andere features doen
     #min_impurity_decrease, de minimale verbetering --> ik denk dat dit heel lastig is, voorkomt miss overfitting, maar ik denk dat dit te veel extra is
     #n_jobs, hij gaat dan meerdere dingen tegelijk doen, is denk ik niet heel relevant
     #verbose, niet heel nuttig geeft je eventueel meer inzicht over hoever die is
@@ -314,3 +312,18 @@ def run_model():
             highest_cv_score = mean_cv_score
             best_data_source = data_source
     return best_data_source
+print('a')
+print(combining_all_features_training('data/train.csv'))
+
+def data_cleaning(data):
+    """Input data matrix"""
+    print(data.shape())
+    for i in range(data.shape[1]):
+        print('b')
+        for j in range(data.shape[0]):
+            if data[i,j] is not float and data[i,j] is not int:
+                print(i,' ',j)
+                raise ValueError("You have a wrong kind of structure in your matrix")
+                
+
+data_cleaning(combining_all_features_training('data/train.csv'))
