@@ -71,7 +71,7 @@ class protein:
         self.document=document
 
     def extract_sequence(self):
-        """no input but the document earlier made shoudl be in the format of:
+        """no input but the document earlier made should be in the format of:
         first the uniprot-id, second the proteinacronym and last the one
         letter code sequence of the protein, split by comma's. the first
         line is to tell, which column is which. the output is a dictionary,
@@ -122,12 +122,12 @@ def splittingdata(X_train, y_train, percentage):
     import random
 
     #calculates trainingsize with percentage
-    samples, features= X_train.shape
-    training_size=int(percentage*samples)
+    n_samples, n_features= X_train.shape
+    training_size=int(percentage*n_samples)
 
     #permutation makes a random order so data
     #is split randomly.
-    permutation=np.random.permutation(samples)
+    permutation=np.random.permutation(n_samples)
 
     #shuffles data with permutation
     X_shuffled=X_train[permutation]
@@ -177,13 +177,12 @@ def RF_error(model, X_test, y_test):
 def combining_all_features_training(datafile):
     """This functions makes an matrix with the descriptors from the ligands and proteins in the file
     
-    Input: csv-file with a format of the trainingsset (colom 1:SMILES, colom 2:UNIProt_ID, colom 3:affinity)
+    Input: csv-file with a format of the training set (colom 1:SMILES, colom 2:UNIProt_ID, colom 3:affinity)
     
-    Output: matrix (samples*features)
+    Output: matrix (n_samples*n_features) and affinity (np.array of length n_samples)
     """
     SMILES,UNIProt_ID,affinity=data_training_splitting(datafile)
-
-    for i in range (len(SMILES)):
+    for i in range(len(SMILES)):
         ligand=small_molecule(SMILES[i])
         ligand_features=ligand.rdkit_descriptor()
 
@@ -191,15 +190,14 @@ def combining_all_features_training(datafile):
         peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
         peptide_features=np.array(peptide_features_list)
         all_features=np.concatenate((ligand_features, peptide_features))
-
         if i==0:
             matrix=all_features
         
         else:
             matrix=np.vstack((matrix,all_features))
 
-    
-    return matrix
+    affinity = np.array(affinity)
+    return matrix, affinity
 
 def combining_all_features_test(datafile):
     """This functions makes an matrix with the descriptors from the ligands and proteins in the file
@@ -210,7 +208,7 @@ def combining_all_features_test(datafile):
     """
     SMILES,UNIProt_ID=data_test_splitting(datafile)
 
-    for i in range (len(SMILES)):
+    for i in range(len(SMILES)):
         ligand=small_molecule(SMILES[i])
         ligand_features=ligand.rdkit_descriptor()
 
@@ -229,8 +227,9 @@ def combining_all_features_test(datafile):
     
     return matrix
 
-def fit_PCA(X, n_components):
-    """performs a PCA on the data in X (np.array) and returns the features transformed onto the principal component feature space as X_reduced (np.array)"""
+def fit_PCA(X, n_components=None):
+    """performs a PCA on the data in X (np.array) and 
+    returns the features transformed onto the principal component feature space as X_reduced (np.array)"""
     X_reduced = sklearn.decomposition.PCA(n_components=n_components).fit_transform(X)
     return X_reduced
 
@@ -244,8 +243,18 @@ def plot_PCA(X_reduced, y, component1, component2):
     fig = plt.figure()
     ax = fig.add_subplot()
     scatter = ax.scatter(X_reduced[:,component1], X_reduced[:,component2], c=y)
-    plt.show()
+    return scatter
 
-print(combining_all_features_training('data/train.csv'))
-
-
+#ONderstaande functie is voor ons eigen gebruik, voor als we het complete model willen gaan testen
+def run_model():
+    """runs the complete model, including as many functions we have right now as possible"""
+    X,y = combining_all_features_training('data/train.csv')
+    train_set, validation_set = splittingdata(X, y, 0.3)      #splits 30% of the data to the validation set, which is reserved for evaluation of the final model
+    X_train_raw, y_train = train_set
+    scaler = set_scaling(X_train_raw)
+    X_train_scaled = data_scaling(scaler, X_train_raw)
+    #Hier moet de data cleaning functie komen (Evelien)
+    X_reduced_pca = fit_PCA(X_train_scaled)
+    scatterplot = plot_PCA(X_reduced_pca, y_train, 0, 1)
+    for data_source in [X_train_raw, X_train_scaled, X_reduced_pca]:    #Hier moet nog X_train_cleaned bij (Evelien)
+        pass #Hier komt de cross-validation loop om de verschillende data sources te vergelijken
