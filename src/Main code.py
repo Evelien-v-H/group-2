@@ -46,8 +46,8 @@ def data_test_splitting(datafile):
         
         Output: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore"""
     df=open_data(datafile)
-    SMILES=df.iloc[:,0].to_numpy()
-    UNIProt_ID=df.iloc[:,1].to_numpy()
+    SMILES=df.iloc[:,1].to_numpy()
+    UNIProt_ID=df.iloc[:,2].to_numpy()
     return SMILES,UNIProt_ID
 
 class small_molecule:
@@ -244,8 +244,7 @@ def combining_all_features_training(datafile):
         else:
             matrix=np.vstack((matrix,all_features))
 
-    affinity = np.array(affinity)
-    return matrix, affinity
+    return matrix
 
 def combining_all_features_test(datafile):
     """This functions makes an matrix with the descriptors from the ligands and proteins in the file
@@ -255,7 +254,7 @@ def combining_all_features_test(datafile):
     Output: matrix (samples*features)
     """
     SMILES,UNIProt_ID=data_test_splitting(datafile)
-
+    print(SMILES,UNIProt_ID)
     for i in range(len(SMILES)):
         ligand=small_molecule(SMILES[i])
         ligand_features=ligand.rdkit_descriptor()
@@ -271,7 +270,7 @@ def combining_all_features_test(datafile):
             matrix=all_features
         
         else:
-            matrix=np.vstack(matrix,all_features)
+            matrix=np.vstack((matrix,all_features))
     
     return matrix
 
@@ -312,18 +311,22 @@ def run_model():
             highest_cv_score = mean_cv_score
             best_data_source = data_source
     return best_data_source
-print('a')
-print(combining_all_features_training('data/train.csv'))
+
+
 
 def data_cleaning(data):
     """Input data matrix"""
-    print(data.shape())
+    
     for i in range(data.shape[1]):
         print('b')
         for j in range(data.shape[0]):
-            if data[i,j] is not float and data[i,j] is not int:
-                print(i,' ',j)
-                raise ValueError("You have a wrong kind of structure in your matrix")
+            if isinstance(data[j, i], (float, int)) and not np.isnan(data[j,i]):
+                if 0==1:
+                    print('a')
+            else:
+                print(j,i)
+                print(data[j,i])
+                
                 
 
-data_cleaning(combining_all_features_training('data/train.csv'))
+
