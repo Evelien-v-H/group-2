@@ -152,10 +152,13 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
                                                         ccp_alpha=ccp_alpha, max_samples=max_samples, monotonic_cst=monotonic_cst)
     random_forest.fit(X,y)
     return random_forest
-        Returns a list of all numerical features from peptidy of this protein"""    
-        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
-        peptidy_features_list = list(peptidy_features_dict.values())
-        return peptidy_features_list
+
+def extract_features(self, sequence):
+    """extracts the protein features from the amino acid sequence using peptidy. 
+    Returns a list of all numerical features from peptidy of this protein"""    
+    peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
+    peptidy_features_list = list(peptidy_features_dict.values())
+    return peptidy_features_list
 
 
 def splittingdata(X_train, y_train, percentage):
@@ -275,6 +278,6 @@ def combining_all_features_test(datafile):
     
     return matrix
 
-print(combining_all_features_training('data/train.csv'))
+
 
 
