@@ -295,7 +295,7 @@ def plot_PCA(X_reduced, y, component1, component2):
     scatter = ax.scatter(X_reduced[:,component1], X_reduced[:,component2], c=y)
     return scatter
 
-#ONderstaande functie is voor ons eigen gebruik, voor als we het complete model willen gaan testen
+#Onderstaande functie is voor ons eigen gebruik, voor als we het complete model willen gaan testen
 def run_model():
     """runs the complete model, including as many functions we have right now as possible"""
     X,y = combining_all_features_training('data/train.csv')
@@ -307,4 +307,10 @@ def run_model():
     X_reduced_pca = fit_PCA(X_train_scaled)
     scatterplot = plot_PCA(X_reduced_pca, y_train, 0, 1)
     for data_source in [X_train_raw, X_train_scaled, X_reduced_pca]:    #Hier moet nog X_train_cleaned bij (Evelien)
-        pass #Hier komt de cross-validation loop om de verschillende data sources te vergelijken
+        highest_cv_score = 0
+        clf = sklearn.ensemble.RandomForestRegressor()      #hier moeten nog hyperparameters in
+        mean_cv_score = sklearn.model_selection.cross_val_score(clf, data_source, y_train, cv=5).mean()       #vinden we cv=5 goed?
+        if mean_cv_score > highest_cv_score:
+            highest_cv_score = mean_cv_score
+            best_data_source = data_source
+    return best_data_source
