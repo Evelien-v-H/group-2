@@ -9,6 +9,7 @@ from rdkit.Chem import MACCSkeys
 
 import peptidy as pep
 
+from peptidy import descriptors
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
 
@@ -24,7 +25,7 @@ def open_data(datafile):
     return df
 
 
-def data_training(datafile):
+def data_training_splitting(datafile):
     """This function splits the dataset in a SMILES array, UNIProt_ID and a affinity score. 
         
         input: a csv file like the given trainingset. The first colom is the SMILES-string, the second colom is the UNIProt_ID and the third 
@@ -37,10 +38,17 @@ def data_training(datafile):
     affinity=df.iloc[:,2].to_numpy()
     return SMILES,UNIProt_ID,affinity
 
+def data_test_splitting(datafile):
+    """This function splits the dataset in a SMILES array, UNIProt_ID and a affinity score. 
+        
+        input: a csv file like the given testset. The first colom is the SMILES-string and the second colom is the UNIProt_ID
+        
+        Output: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore"""
+    df=open_data(datafile)
+    SMILES=df.iloc[:,0].to_numpy()
+    UNIProt_ID=df.iloc[:,1].to_numpy()
+    return SMILES,UNIProt_ID
 
-
-#Opmerkingen voor het inleveren van de code:
-    #RDkit moet nog het stukje aanvullen 2X worden weggehaald
 class small_molecule:
     def __init__(self,SMILES):
         self.SMILES=str(SMILES)
@@ -70,7 +78,7 @@ class protein:
         letter code sequence of the protein, split by comma's. the first
         line is to tell, which column is which. the output is a dictionary,
         with as keys the uniprotid and as value the one letter code 
-        sequence of the protein."""
+        sequence of the protein. (For this project it is the protein_info.csv)"""
         file=open(self.document) #document needs to be in the right format
         lines=file.readlines()
         lines.pop(0)
@@ -144,5 +152,129 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
                                                         ccp_alpha=ccp_alpha, max_samples=max_samples, monotonic_cst=monotonic_cst)
     random_forest.fit(X,y)
     return random_forest
+        Returns a list of all numerical features from peptidy of this protein"""    
+        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
+        peptidy_features_list = list(peptidy_features_dict.values())
+        return peptidy_features_list
+
+
+def splittingdata(X_train, y_train, percentage):
+    """This function splits the data randomly into training data set and a validation
+    data set. These training and validation set are returned as a tuple of 2 tuples
+    as (X_training,y_training),(X_validation, y_validation). It splits the the data in
+    two with the percentage to determine how big training data set is. Percentage is
+    a float between 1 and 0."""
+    import numpy as np
+    import random
+
+    #calculates trainingsize with percentage
+    samples, features= X_train.shape
+    training_size=int(percentage*samples)
+
+    #permutation makes a random order so data
+    #is split randomly.
+    permutation=np.random.permutation(samples)
+
+    #shuffles data with permutation
+    X_shuffled=X_train[permutation]
+    y_shuffled=y_train[permutation]
+
+    #makes the training and validation sets
+    X_training=X_shuffled[:training_size]
+    X_validation=X_shuffled[training_size:]
+    y_training=y_shuffled[:training_size]
+    y_validation=y_shuffled[training_size:]
+
+    training=(X_training,y_training)
+    validation=(X_validation,y_validation)
+
+    return training,validation
+
+def set_scaling(X):
+    """makes the scaler, from given data set X. the scaler used
+    is a minmax scaler. it returns a object with a fixed scaler"""
+    scaler=sklearn.preprocessing.MinMaxScaler()
+    return scaler.fix(X)
+
+def data_scaling(scaler, X):
+    """transforms data from fixed scalar. input is the fixed scaler
+    and the data that need to be scaled. the output is th scaled data"""
+    return scaler.transform(X)
+
+def RF_fitting(X_train, y_train):
+    """fits a random forest to a X_train and a y_train. input is a
+    dataset with X_train and y_train in an array. output is the fitted
+    model of the randomforest."""
+    model= sklearn.ensemble.RandomForestRegressor()
+    return model.fit(X_train,y_train)
+
+def RF_predict(model, X_test):
+    """uses a defined model to predict the y values of X_test. input
+    is an array X_test and the defined model. output is an array of 
+    the predicted y values"""
+    return model.predict(X_test)
+
+def RF_error(model, X_test, y_test):
+    """uses R2 to calculate the error of the model. input is a defined
+    model, an array X_test and an array y_test. the output is a error
+    as a float."""
+    return model.score(X_test,y_test)
+    
+def combining_all_features_training(datafile):
+    """This functions makes an matrix with the descriptors from the ligands and proteins in the file
+    
+    Input: csv-file with a format of the trainingsset (colom 1:SMILES, colom 2:UNIProt_ID, colom 3:affinity)
+    
+    Output: matrix (samples*features)
+    """
+    SMILES,UNIProt_ID,affinity=data_training_splitting(datafile)
+
+    for i in range (len(SMILES)):
+        ligand=small_molecule(SMILES[i])
+        ligand_features=ligand.rdkit_descriptor()
+
+        peptide=protein(UNIProt_ID[i],'data/protein_info.csv' )
+        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
+        peptide_features=np.array(peptide_features_list)
+        all_features=np.concatenate((ligand_features, peptide_features))
+
+        if i==0:
+            matrix=all_features
+        
+        else:
+            matrix=np.vstack((matrix,all_features))
+
+    
+    return matrix
+
+def combining_all_features_test(datafile):
+    """This functions makes an matrix with the descriptors from the ligands and proteins in the file
+    
+    Input: csv-file with a format of the testset (colom 1:SMILES, colom 2:UNIProt_ID)
+    
+    Output: matrix (samples*features)
+    """
+    SMILES,UNIProt_ID=data_test_splitting(datafile)
+
+    for i in range (len(SMILES)):
+        ligand=small_molecule(SMILES[i])
+        ligand_features=ligand.rdkit_descriptor()
+
+        peptide=protein(UNIProt_ID[i],'data/protein_info.csv' )
+        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
+        peptide_features=np.array(peptide_features_list)
+        
+        all_features=np.concatenate((ligand_features, peptide_features))
+
+
+        if i==0:
+            matrix=all_features
+        
+        else:
+            matrix=np.vstack(matrix,all_features)
+    
+    return matrix
+
+print(combining_all_features_training('data/train.csv'))
 
 
