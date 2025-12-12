@@ -346,8 +346,6 @@ endtime=time.time()
 print("the model is trained en data is predicted")
 print("this took " + endtime-starttime + "seconds")
 
-scatterplot = plot_PCA(X_train_transformed, y_train, 0, 1)
-
 def data_cleaning(data):
     """Input data matrix"""
     
