@@ -345,5 +345,31 @@ def data_cleaning(data):
                 print(data[j,i])
                 
                 
+def data_cleaning(data):
+    """Input data matrix"""
+    
+    for i in range(data.shape[1]):
+        for j in range(data.shape[0]):
+            if isinstance(data[j, i], (float, int)) and not np.isnan(data[j,i]):
+                if data[j,i]>=np.finfo(np.float32).max:
+                    print(j,i)
+                    print(data[j,i])
+            
+            else:
+                print(j,i)
+                print(data[j,i])
+    return data
 
+def check_matrix(X):
+    print('a')
+    print("Heeft NaN:", np.isnan(X).any())
+    print("Heeft +inf:", np.isinf(X).any())
+    print("Heeft -inf:", np.isneginf(X).any())
+    print("Max waarde:", np.nanmax(X))
+    print("Min waarde:", np.nanmin(X))
+
+
+
+#check_matrix(combining_all_features_training('data/test.csv'))
+#data_cleaning((combining_all_features_training('data/train.csv')))                
 
