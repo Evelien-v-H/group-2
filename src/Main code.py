@@ -273,8 +273,8 @@ def combining_all_features_test(datafile):
 def fit_PCA(X, n_components=None):
     """performs a PCA on the data in X (np.array) and 
     returns the features transformed onto the principal component feature space as X_reduced (np.array)"""
-    X_reduced = sklearn.decomposition.PCA(n_components=n_components).fit_transform(X)
-    return X_reduced
+    X_reduced, variance_per_pc = sklearn.decomposition.PCA(n_components=n_components).fit_transform(X)
+    return X_reduced, variance_per_pc
 
 def plot_PCA(X_reduced, y, component1, component2):
     """makes a PCA scatterplot with on the horizontal axis component1 and component2. 
@@ -286,20 +286,37 @@ def plot_PCA(X_reduced, y, component1, component2):
     fig = plt.figure()
     ax = fig.add_subplot()
     scatter = ax.scatter(X_reduced[:,component1], X_reduced[:,component2], c=y)
-    return scatter
+    scatter.show()
 
 #Onderstaande 2 functies zijn voor ons eigen gebruik, voor als we gaan testen welke data source het beste is (Iris, vrijdagavond)
-def make_data_sources_dict(X_train_raw, y_train):
-    """reads data, applies cleaning, scaling, and pca where relevant, and returns the dictionary that can be used for the test_data_source function"""
+def make_data_sources_dict(X_train_raw):
+    """applies cleaning, scaling, and pca where relevant.
+    returns the dictionary that can be used for the test_data_source function. 
+    This dictionary includes all data that will be tried for selecting the best input data:
+        - scaled
+        - cleaned (= outliers removed)
+        - cleaned + scaled
+        - scaled and transformed into pca feature space with enough features to explain 60% of variance
+        - scaled and transformed, 80%
+        - scaled and transformed, 95%
+        - the previous three but with the cleaning step"""
+    
     scaler = set_scaling(X_train_raw)
     X_train_scaled = data_scaling(scaler, X_train_raw)
-    X_train_transformed = fit_PCA(X_train_scaled)
+    X_train_all_pc = fit_PCA(X_train_scaled)
+    X_train_pca66 = select_principal_components(X_train_all_pc, 0.66)
+    X_train_pca80 = select_principal_components(X_train_all_pc, 0.80)
+    X_train_pca95 =select_principal_components(X_train_all_pc, 0.95)
     X_train_cleaned = #Hier moet de data cleaning functie komen (Evelien) -> dit is outliers verwijderen
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
-    X_train_transformed_cleaned = fit_PCA(X_train_cleaned_scaled)
+    X_train_cleaned_all_pc = fit_PCA(X_train_cleaned_scaled)
+    X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_all_pc, 0.66)
+    X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_all_pc, 0.80)
+    X_train_cleaned_pca95 =select_principal_components(X_train_cleaned_all_pc, 0.95)
 
     data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled, 
-                            'Cleaned+scaled+transformed':X_train_transformed_cleaned, 'Scaled+transformed':X_train_transformed}
+                         'Scaled+pca66':X_train_pca66, 'Scaled+pca80':X_train_pca80, 'Scaled+pca95':X_train_pca95,
+                         'Cleaned+scaled+pca66':X_train_cleaned_pca66, 'Cleaned+scaled+pca80':X_train_cleaned_pca80, 'Cleaned+scaled+pca95':X_train_cleaned_pca95}
     return data_sources_dict
 
 def best_data_source(data_sources_dict, y_train):
@@ -320,8 +337,19 @@ def best_data_source(data_sources_dict, y_train):
 X,y = combining_all_features_training('data/train.csv')
 train_set, validation_set = splittingdata(X, y, 0.2)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
 X_train_raw, y_train = train_set
-data_sources_dict = make_data_sources_dict(X_train_raw, y_train)
+data_sources_dict = make_data_sources_dict(X_train_raw)
 best_data_source(data_sources_dict, y_train)
+
+def select_principal_components(all_principal_components, goal_cumulative_variance):
+    """from the input array all_principal_components, creates a new array relevant_principle_components, which is a subset
+    of the input array that includes all relevant PCs to reach the goal_cumulative_variance"""
+    cumulative_variance = 0
+    pc = 0
+    while cumulative_variance < goal_cumulative_variance:
+        cumulative_variance += goal_cumulative_variance
+        pc += 1
+    relevant_principle_components = all_principal_components[:pc+1, :]
+    return relevant_principle_components
 
 
 def kaggle_submission(X_test,model,filename):
@@ -332,7 +360,6 @@ def kaggle_submission(X_test,model,filename):
         f.write(str(a)+"\n")
     f.close()
     return
-
 
 
 def data_cleaning(data):
