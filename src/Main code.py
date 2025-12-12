@@ -294,7 +294,7 @@ def fit_PCA(X, n_components=None):
 def plot_PCA(X_reduced, y, component1, component2):
     """makes a PCA scatterplot with on the horizontal axis component1 and component2. 
     Parameters: 
-        X_reduced (np.array): all data transformed onto the feature space of the principle components.
+        X_reduced (np.array): all data transformed onto the feature space of the principal components.
         component1 (int): index of principal component to be plotted on horizontal axis
         component2 (int): index of principal component to be plotted on vertical axis
      """
@@ -318,16 +318,16 @@ def make_data_sources_dict(X_train_raw):
     
     scaler = set_scaling(X_train_raw)
     X_train_scaled = data_scaling(scaler, X_train_raw)
-    X_train_all_pc = fit_PCA(X_train_scaled)
-    X_train_pca66 = select_principal_components(X_train_all_pc, 0.66)
-    X_train_pca80 = select_principal_components(X_train_all_pc, 0.80)
-    X_train_pca95 =select_principal_components(X_train_all_pc, 0.95)
+    X_train_all_pc, variance_per_pc = fit_PCA(X_train_scaled)
+    X_train_pca66 = select_principal_components(X_train_all_pc, variance_per_pc, 0.66)
+    X_train_pca80 = select_principal_components(X_train_all_pc, variance_per_pc, 0.80)
+    X_train_pca95 =select_principal_components(X_train_all_pc, variance_per_pc, 0.95)
     X_train_cleaned = data_cleaning(X_train_raw)
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
-    X_train_cleaned_all_pc = fit_PCA(X_train_cleaned_scaled)
-    X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_all_pc, 0.66)
-    X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_all_pc, 0.80)
-    X_train_cleaned_pca95 =select_principal_components(X_train_cleaned_all_pc, 0.95)
+    X_train_cleaned_all_pc, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
+    X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_all_pc, variance_per_pc_cleaned, 0.66)
+    X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_all_pc, variance_per_pc_cleaned, 0.80)
+    X_train_cleaned_pca95 =select_principal_components(X_train_cleaned_all_pc, variance_per_pc_cleaned, 0.95)
 
     data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled, 
                          'Scaled+pca66':X_train_pca66, 'Scaled+pca80':X_train_pca80, 'Scaled+pca95':X_train_pca95,
@@ -359,16 +359,18 @@ def data_sources_training():
     best_data_source(data_sources_dict, y_train)
     return
 
-def select_principal_components(all_principal_components, goal_cumulative_variance):
+def select_principal_components(all_principal_components, variance_explained, goal_cumulative_variance):
     """from the input array all_principal_components, creates a new array relevant_principle_components, which is a subset
-    of the input array that includes all relevant PCs to reach the goal_cumulative_variance"""
+    of the input array that includes all relevant PCs to reach the goal_cumulative_variance. variance_explained is a np.array
+    of shape (n_principal_components,) returned by the function fit_PCA that contains the portion of variance explained by each
+     principal component."""
     cumulative_variance = 0
     pc = 0
     while cumulative_variance < goal_cumulative_variance:
-        cumulative_variance += goal_cumulative_variance
+        cumulative_variance += variance_explained[pc]
         pc += 1
-    relevant_principle_components = all_principal_components[:pc+1, :]
-    return relevant_principle_components
+    relevant_principal_components = all_principal_components[:pc, :]
+    return relevant_principal_components
 
 
 def kaggle_submission(X_test,model,filename):
@@ -475,5 +477,5 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-
+def make_pca_plots():
 
