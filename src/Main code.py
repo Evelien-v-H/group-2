@@ -1,3 +1,5 @@
+run=True
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -393,23 +395,23 @@ def data_cleaning(data):
                 print(j,i)
                 print(data[j,i])
                 
-                
-#starttime=time.time()
-#print("started")
-#X,y=combining_all_features_training("data/train.csv")
-#X_test=combining_all_features_test("data/test.csv")
-#print("data is prepared")
-#scaler=set_scaling(X)
-#X_scaled=data_scaling(scaler,X)
-#X_test_scaled=data_scaling(scaler,X)
-#print("data is scaled")
-#model=train_model(X_scaled,y)
-#print("model is trained")
-#kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
-#print("file is made with predictions")
-#endtime=time.time()
-#print("the model is trained en data is predicted")
-#print("this took " + str(endtime-starttime) + "seconds")
+if run is True:                
+    starttime=time.time()
+    print("started")
+    X,y=combining_all_features_training("data/train.csv")
+    X_test=combining_all_features_test("data/test.csv")
+    print("data is prepared")
+    scaler=set_scaling(X)
+    X_scaled=data_scaling(scaler,X)
+    X_test_scaled=data_scaling(scaler,X)
+    print("data is scaled")
+    model=train_model(X_scaled,y)
+    print("model is trained")
+    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    print("file is made with predictions")
+    endtime=time.time()
+    print("the model is trained en data is predicted")
+    print("this took " + str(endtime-starttime) + "seconds")
 
 def data_cleaning(data):
     """Input data matrix"""
