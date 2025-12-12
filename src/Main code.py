@@ -7,6 +7,7 @@ from rdkit.Chem import Descriptors, Lipinski, Crippen, rdMolDescriptors
 from rdkit import DataStructs
 from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
+from rdkit.Chem import GraphDescriptors
 
 import peptidy as pep
 
@@ -78,6 +79,8 @@ class small_molecule:
         self.molecule=Chem.MolFromSmiles(str(SMILES))
 
 
+
+
     def rdkit_descriptor(self):
         """This function returns an array with all sorts of descriptors gotten from rdkit
         
@@ -85,7 +88,17 @@ class small_molecule:
         
         output an array"""
         dictionary=Descriptors.CalcMolDescriptors(self.molecule, missingVal=None, silent=True)
-        array = np.array(list(dictionary.values()), dtype=float)
+        descriptor_list=list((dictionary.values()))
+        descriptor_list.pop(42)
+        
+        #With testing the code we found out that IPC the descriptor that is now deleted gave problems 
+        #if it was implemented this way, because it returned to big numbers. This is an known phenonemon and an easy work around as 
+        #implemented here
+
+        IPC=GraphDescriptors.Ipc(self.molecule,avg=True)
+        descriptor_list.append(IPC)
+        array=np.array(descriptor_list)
+        
         return array
 
 
@@ -381,22 +394,22 @@ def data_cleaning(data):
                 print(data[j,i])
                 
                 
-starttime=time.time()
-print("started")
-X,y=combining_all_features_training("data/train.csv")
-X_test=combining_all_features_test("data/test.csv")
-print("data is prepared")
-scaler=set_scaling(X)
-X_scaled=data_scaling(scaler,X)
-X_test_scaled=data_scaling(scaler,X)
-print("data is scaled")
-model=train_model(X_scaled,y)
-print("model is trained")
-kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
-print("file is made with predictions")
-endtime=time.time()
-print("the model is trained en data is predicted")
-print("this took " + str(endtime-starttime) + "seconds")
+#starttime=time.time()
+#print("started")
+#X,y=combining_all_features_training("data/train.csv")
+#X_test=combining_all_features_test("data/test.csv")
+#print("data is prepared")
+#scaler=set_scaling(X)
+#X_scaled=data_scaling(scaler,X)
+#X_test_scaled=data_scaling(scaler,X)
+#print("data is scaled")
+#model=train_model(X_scaled,y)
+#print("model is trained")
+#kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+#print("file is made with predictions")
+#endtime=time.time()
+#print("the model is trained en data is predicted")
+#print("this took " + str(endtime-starttime) + "seconds")
 
 def data_cleaning(data):
     """Input data matrix"""
@@ -414,6 +427,7 @@ def data_cleaning(data):
     return data
 
 def check_matrix(X):
+    print(X)
     print('a')
     print("Heeft NaN:", np.isnan(X).any())
     print("Heeft +inf:", np.isinf(X).any())
@@ -422,7 +436,4 @@ def check_matrix(X):
     print("Min waarde:", np.nanmin(X))
 
 
-
-#check_matrix(combining_all_features_training('data/test.csv'))
-#data_cleaning((combining_all_features_training('data/train.csv')))                
 
