@@ -1,3 +1,5 @@
+run=True
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,6 +9,7 @@ from rdkit.Chem import Descriptors, Lipinski, Crippen, rdMolDescriptors
 from rdkit import DataStructs
 from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
+from rdkit.Chem import GraphDescriptors
 
 import peptidy as pep
 
@@ -78,6 +81,8 @@ class small_molecule:
         self.molecule=Chem.MolFromSmiles(str(SMILES))
 
 
+
+
     def rdkit_descriptor(self):
         """This function returns an array with all sorts of descriptors gotten from rdkit
         
@@ -85,7 +90,17 @@ class small_molecule:
         
         output an array"""
         dictionary=Descriptors.CalcMolDescriptors(self.molecule, missingVal=None, silent=True)
-        array = np.array(list(dictionary.values()), dtype=float)
+        descriptor_list=list((dictionary.values()))
+        descriptor_list.pop(42)
+        
+        #With testing the code we found out that IPC the descriptor that is now deleted gave problems 
+        #if it was implemented this way, because it returned to big numbers. This is an known phenonemon and an easy work around as 
+        #implemented here
+
+        IPC=GraphDescriptors.Ipc(self.molecule,avg=True)
+        descriptor_list.append(IPC)
+        array=np.array(descriptor_list)
+        
         return array
 
 
@@ -307,7 +322,7 @@ def make_data_sources_dict(X_train_raw):
     X_train_pca66 = select_principal_components(X_train_all_pc, 0.66)
     X_train_pca80 = select_principal_components(X_train_all_pc, 0.80)
     X_train_pca95 =select_principal_components(X_train_all_pc, 0.95)
-    X_train_cleaned = ''#Hier moet de data cleaning functie komen (Evelien) -> dit is outliers verwijderen
+    X_train_cleaned = data_cleaning(X_train_raw)
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
     X_train_cleaned_all_pc = fit_PCA(X_train_cleaned_scaled)
     X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_all_pc, 0.66)
@@ -324,7 +339,9 @@ def best_data_source(data_sources_dict, y_train):
     for data_source in range(len(data_sources_dict)):                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
         current_X_train = list(data_sources_dict.values())[data_source]          #the current X_train
         current_data_source = list(data_sources_dict.keys())[data_source]        #the key from the dictionary of the current X_train
-        clf = sklearn.ensemble.RandomForestRegressor()                #hier moeten nog hyperparameters in
+        clf = sklearn.ensemble.RandomForestRegressor(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         mean_cv_score = sklearn.model_selection.cross_val_score(clf, current_X_train, y_train, cv=5).mean()
         print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
         if mean_cv_score > highest_cv_score:        
@@ -380,40 +397,77 @@ def data_cleaning(data):
                 print(j,i)
                 print(data[j,i])
                 
-                
-starttime=time.time()
-print("started")
-X,y=combining_all_features_training("data/train.csv")
-X_test=combining_all_features_test("data/test.csv")
-print("data is prepared")
-scaler=set_scaling(X)
-X_scaled=data_scaling(scaler,X)
-X_test_scaled=data_scaling(scaler,X_test)
-print("data is scaled")
-model=train_model(X_scaled,y)
-print("model is trained")
-kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
-print("file is made with predictions")
-endtime=time.time()
-print("the model is trained en data is predicted")
-print("this took " + str(endtime-starttime) + "seconds")
+if run is True:                
+    starttime=time.time()
+    print("started")
+    X,y=combining_all_features_training("data/train.csv")
+    X_test=combining_all_features_test("data/test.csv")
+    print("data is prepared")
+    scaler=set_scaling(X)
+    X_scaled=data_scaling(scaler,X)
+    X_test_scaled=data_scaling(scaler,X_test)
+    print("data is scaled")
+    model=train_model(X_scaled,y)
+    print("model is trained")
+    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    print("file is made with predictions")
+    endtime=time.time()
+    print("the model is trained en data is predicted")
+    print("this took " + str(endtime-starttime) + "seconds")
+
+def is_number(val):
+    try:
+        float(val)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 def data_cleaning(data):
-    """Input data matrix"""
+    """Cleans the data, removes coloms without floats or strings and replaces empty values or strings in features and gives an error 
+    if een float or int is to big for np.float32
     
+    Input data matrix (n*m)
+    
+    Output an matrix, size is (n*unknown) unknown is dependend on the useless features because string or none information """
+    irrelevant_colums=[]
     for i in range(data.shape[1]):
+        already_errorvalue=False
         for j in range(data.shape[0]):
-            if isinstance(data[j, i], (float, int)) and not np.isnan(data[j,i]):
-                if data[j,i]>=np.finfo(np.float32).max:
-                    print(j,i)
-                    print(data[j,i])
+            if is_number(data[j,i]) is True:
+                if float(data[j,i])>=np.finfo(np.float32).max:
+                    raise ValueError("You're value is to big for the float32 of the random forest. Solve this manual")
             
             else:
-                print(j,i)
-                print(data[j,i])
+                if already_errorvalue is False:
+                    values_colom=[]
+                    for k in range(data.shape[0]):
+                        if is_number(data[k,i]) is True:
+                            values_colom.append(float(data[k,i]))
+                            print(values_colom)
+                    
+                    print(len(values_colom))
+                    if len(values_colom)!=0:
+                        mean_value_colom=np.mean(values_colom)
+                        data[j,i]=float(mean_value_colom)
+                    
+                    else:
+                        irrelevant_colums.append(i)
+                    already_errorvalue=True
+                    
+            
+                else:
+                    if i not in irrelevant_colums:
+                        data[j,i]=float(mean_value_colom)
+
+    if len(irrelevant_colums)>0:
+        irrelevant_colums.reverse()
+        for n in irrelevant_colums:
+            data = np.delete(data, n, axis=1)
+
     return data
 
 def check_matrix(X):
+    print(X)
     print('a')
     print("Heeft NaN:", np.isnan(X).any())
     print("Heeft +inf:", np.isinf(X).any())
@@ -422,7 +476,4 @@ def check_matrix(X):
     print("Min waarde:", np.nanmin(X))
 
 
-
-#check_matrix(combining_all_features_training('data/test.csv'))
-#data_cleaning((combining_all_features_training('data/train.csv')))                
 
