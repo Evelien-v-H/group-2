@@ -339,7 +339,9 @@ def best_data_source(data_sources_dict, y_train):
     for data_source in range(len(data_sources_dict)):                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
         current_X_train = list(data_sources_dict.values())[data_source]          #the current X_train
         current_data_source = list(data_sources_dict.keys())[data_source]        #the key from the dictionary of the current X_train
-        clf = sklearn.ensemble.RandomForestRegressor()                #hier moeten nog hyperparameters in
+        clf = sklearn.ensemble.RandomForestRegressor(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         mean_cv_score = sklearn.model_selection.cross_val_score(clf, current_X_train, y_train, cv=5).mean()
         print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
         if mean_cv_score > highest_cv_score:        
