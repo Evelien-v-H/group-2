@@ -291,18 +291,6 @@ def fit_PCA(X, n_components=None):
     X_reduced, variance_per_pc = sklearn.decomposition.PCA(n_components=n_components).fit_transform(X)
     return X_reduced, variance_per_pc
 
-def plot_PCA(X_reduced, y, component1, component2):
-    """makes a PCA scatterplot with on the horizontal axis component1 and component2. 
-    Parameters: 
-        X_reduced (np.array): all data transformed onto the feature space of the principal components.
-        component1 (int): index of principal component to be plotted on horizontal axis
-        component2 (int): index of principal component to be plotted on vertical axis
-     """
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    scatter = ax.scatter(X_reduced[:,component1], X_reduced[:,component2], c=y)
-    scatter.show()
-
 #Onderstaande 2 functies zijn voor ons eigen gebruik, voor als we gaan testen welke data source het beste is (Iris, vrijdagavond)
 def make_data_sources_dict(X_train_raw):
     """applies cleaning, scaling, and pca where relevant.
@@ -477,5 +465,14 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-def make_pca_plots():
-
+def make_pca_plots(all_pc):
+    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. Input parameter: all_pc (np.array): all principal components"""
+    fig, (ax1,ax2,ax3) = plt.subplots(3)
+    fig.suptitle('Principal component plots on cleaned and scaled training data')
+    ax1.scatter(all_pc[0],all_pc[1])
+    ax1.set(xlabel='First PC',ylabel='Second PC')
+    ax2.scatter(all_pc[0],all_pc[2])
+    ax2.set(xlabel='First PC',ylabel='Third PC')
+    ax3.scatter(all_pc[1],all_pc[2])
+    ax3.set(xlabel='Second PC',ylabel='Third PC')
+    plt.show()
