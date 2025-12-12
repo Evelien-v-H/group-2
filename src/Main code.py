@@ -273,8 +273,8 @@ def combining_all_features_test(datafile):
 def fit_PCA(X, n_components=None):
     """performs a PCA on the data in X (np.array) and 
     returns the features transformed onto the principal component feature space as X_reduced (np.array)"""
-    X_reduced = sklearn.decomposition.PCA(n_components=n_components).fit_transform(X)
-    return X_reduced
+    X_reduced, variance_per_pc = sklearn.decomposition.PCA(n_components=n_components).fit_transform(X)
+    return X_reduced, variance_per_pc
 
 def plot_PCA(X_reduced, y, component1, component2):
     """makes a PCA scatterplot with on the horizontal axis component1 and component2. 
@@ -323,6 +323,15 @@ X_train_raw, y_train = train_set
 data_sources_dict = make_data_sources_dict(X_train_raw, y_train)
 best_data_source(data_sources_dict, y_train)
 
+def select_principal_components(all_principle_components, goal_cumulative_variance):
+    cumulative_variance = 0
+    pc = 0
+    while cumulative_variance < goal_cumulative_variance:
+        cumulative_variance += goal_cumulative_variance
+        pc += 1
+    relevant_principle_components = all_principle_components[:pc+1, :]
+    return relevant_principle_components
+
 
 def kaggle_submission(X_test,model,filename):
     affinity_array=RF_predict(model, X_test)
@@ -332,7 +341,6 @@ def kaggle_submission(X_test,model,filename):
         f.write(str(a)+"\n")
     f.close()
     return
-
 
 
 def data_cleaning(data):
