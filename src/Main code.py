@@ -358,10 +358,10 @@ def kaggle_submission(X_test,model,filename):
     affinity_array=RF_predict(model, X_test)
     f=open(filename,'w')
     print(filename+" is made")
-    f.write("ID,affinity_score\n")
+    f.write("ID,affinity_score")
     b=0
     for a in affinity_array:
-        f.write(str(b)+","+ str(a)+"\n")
+        f.write("\n"+str(b)+","+ str(a))
         b+=1
     f.close()
     return
@@ -388,7 +388,7 @@ X_test=combining_all_features_test("data/test.csv")
 print("data is prepared")
 scaler=set_scaling(X)
 X_scaled=data_scaling(scaler,X)
-X_test_scaled=data_scaling(scaler,X)
+X_test_scaled=data_scaling(scaler,X_test)
 print("data is scaled")
 model=train_model(X_scaled,y)
 print("model is trained")
