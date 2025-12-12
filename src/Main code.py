@@ -288,25 +288,41 @@ def plot_PCA(X_reduced, y, component1, component2):
     scatter = ax.scatter(X_reduced[:,component1], X_reduced[:,component2], c=y)
     return scatter
 
-#Onderstaande functie is voor ons eigen gebruik, voor als we het complete model willen gaan testen
-def run_model():
-    """runs the complete model, including as many functions we have right now as possible"""
-    X,y = combining_all_features_training('data/train.csv')
-    train_set, validation_set = splittingdata(X, y, 0.3)      #splits 30% of the data to the validation set, which is reserved for evaluation of the final model
-    X_train_raw, y_train = train_set
+#Onderstaande 2 functies zijn voor ons eigen gebruik, voor als we gaan testen welke data source het beste is (Iris, vrijdagavond)
+def make_data_sources_dict(X_train_raw, y_train):
+    """reads data, applies cleaning, scaling, and pca where relevant, and returns the dictionary that can be used for the test_data_source function"""
     scaler = set_scaling(X_train_raw)
     X_train_scaled = data_scaling(scaler, X_train_raw)
-    #Hier moet de data cleaning functie komen (Evelien)
-    X_reduced_pca = fit_PCA(X_train_scaled)
-    scatterplot = plot_PCA(X_reduced_pca, y_train, 0, 1)
-    for data_source in [X_train_raw, X_train_scaled, X_reduced_pca]:    #Hier moet nog X_train_cleaned bij (Evelien)
-        highest_cv_score = 0
-        clf = sklearn.ensemble.RandomForestRegressor()      #hier moeten nog hyperparameters in
-        mean_cv_score = sklearn.model_selection.cross_val_score(clf, data_source, y_train, cv=5).mean()       #vinden we cv=5 goed?
-        if mean_cv_score > highest_cv_score:
+    X_train_transformed = fit_PCA(X_train_scaled)
+    X_train_cleaned = #Hier moet de data cleaning functie komen (Evelien) -> dit is outliers verwijderen
+    X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
+    X_train_transformed_cleaned = fit_PCA(X_train_cleaned_scaled)
+
+    data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled, 
+                            'Cleaned+scaled+transformed':X_train_transformed_cleaned, 'Scaled+transformed':X_train_transformed}
+    return data_sources_dict
+
+def best_data_source(data_sources_dict, y_train):
+    """tries multiple data sources specified in data_sources_dict to determine the best one using cross-validation"""
+    for data_source in range(len(data_sources_dict)):                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
+        current_X_train = list(data_sources_dict.values())[data_source]          #the current X_train
+        current_data_source = list(data_sources_dict.keys())[data_source]        #the key from the dictionary of the current X_train
+        clf = sklearn.ensemble.RandomForestRegressor()                #hier moeten nog hyperparameters in
+        mean_cv_score = sklearn.model_selection.cross_val_score(clf, current_X_train, y_train, cv=5).mean()
+        print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
+        if mean_cv_score > highest_cv_score:        
             highest_cv_score = mean_cv_score
-            best_data_source = data_source
-    return best_data_source
+            best_data_source = current_data_source          #keeps track of the best data source thus far
+    print(f'The best data source is {best_data_source}')
+
+
+#Code voor Iris om te testen welke data source het beste is
+X,y = combining_all_features_training('data/train.csv')
+train_set, validation_set = splittingdata(X, y, 0.2)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+X_train_raw, y_train = train_set
+data_sources_dict = make_data_sources_dict(X_train_raw, y_train)
+best_data_source(data_sources_dict, y_train)
+
 
 def kaggle_submission(X_test,model,filename):
     affinity_array=RF_predict(model, X_test)
