@@ -190,7 +190,7 @@ def set_scaling(X):
     """makes the scaler, from given data set X. the scaler used
     is a minmax scaler. it returns a object with a fixed scaler"""
     scaler=sklearn.preprocessing.MinMaxScaler()
-    return scaler.fix(X)
+    return scaler.fit(X)
 
 def data_scaling(scaler, X):
     """transforms data from fixed scalar. input is the fixed scaler
@@ -239,7 +239,7 @@ def combining_all_features_training(datafile):
         else:
             matrix=np.vstack((matrix,all_features))
 
-    return matrix
+    return matrix,affinity
 
 def combining_all_features_test(datafile):
     """This functions makes an matrix with the descriptors from the ligands and proteins in the file
@@ -313,22 +313,10 @@ def kaggle_submission(X_test,model,filename):
     f=open(filename,'w')
     f.write("id,affinity_score/n")
     for a in affinity_array:
-        f.write(a+"/n")
+        f.write(str(a)+"\n")
     f.close()
     return
 
-starttime=time.time()
-print("started")
-X,y=combining_all_features_training("data/train.csv")
-X_test=combining_all_features_test("data/test.csv")
-print("data is prepared")
-model=train_model(X,y)
-print("model is trained")
-kaggle_submission(X_test,model,"docs/Kaggle_submission.txt")
-print("file is made with predictions")
-endtime=time.time()
-print("the model is trained en data is predicted")
-print("this took " + endtime-starttime + "seconds")
 
 
 def data_cleaning(data):
@@ -345,6 +333,22 @@ def data_cleaning(data):
                 print(data[j,i])
                 
                 
+starttime=time.time()
+print("started")
+X,y=combining_all_features_training("data/train.csv")
+X_test=combining_all_features_test("data/test.csv")
+print("data is prepared")
+scaler=set_scaling(X)
+X_scaled=data_scaling(scaler,X)
+X_test_scaled=data_scaling(scaler,X)
+print("data is scaled")
+model=train_model(X_scaled,y)
+print("model is trained")
+kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.txt")
+print("file is made with predictions")
+endtime=time.time()
+print("the model is trained en data is predicted")
+print("this took " + str(endtime-starttime) + "seconds")
 def data_cleaning(data):
     """Input data matrix"""
     
