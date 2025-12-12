@@ -307,7 +307,7 @@ def make_data_sources_dict(X_train_raw):
     X_train_pca66 = select_principal_components(X_train_all_pc, 0.66)
     X_train_pca80 = select_principal_components(X_train_all_pc, 0.80)
     X_train_pca95 =select_principal_components(X_train_all_pc, 0.95)
-    X_train_cleaned = #Hier moet de data cleaning functie komen (Evelien) -> dit is outliers verwijderen
+    X_train_cleaned = ''#Hier moet de data cleaning functie komen (Evelien) -> dit is outliers verwijderen
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
     X_train_cleaned_all_pc = fit_PCA(X_train_cleaned_scaled)
     X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_all_pc, 0.66)
@@ -334,11 +334,13 @@ def best_data_source(data_sources_dict, y_train):
 
 
 #Code voor Iris om te testen welke data source het beste is
-X,y = combining_all_features_training('data/train.csv')
-train_set, validation_set = splittingdata(X, y, 0.2)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
-X_train_raw, y_train = train_set
-data_sources_dict = make_data_sources_dict(X_train_raw)
-best_data_source(data_sources_dict, y_train)
+def data_sources_training():
+    X,y = combining_all_features_training('data/train.csv')
+    train_set, validation_set = splittingdata(X, y, 0.2)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+    X_train_raw, y_train = train_set
+    data_sources_dict = make_data_sources_dict(X_train_raw)
+    best_data_source(data_sources_dict, y_train)
+    return
 
 def select_principal_components(all_principal_components, goal_cumulative_variance):
     """from the input array all_principal_components, creates a new array relevant_principle_components, which is a subset
@@ -355,9 +357,12 @@ def select_principal_components(all_principal_components, goal_cumulative_varian
 def kaggle_submission(X_test,model,filename):
     affinity_array=RF_predict(model, X_test)
     f=open(filename,'w')
-    f.write("id,affinity_score/n")
+    print(filename+" is made")
+    f.write("ID,affinity_score\n")
+    b=0
     for a in affinity_array:
-        f.write(str(a)+"\n")
+        f.write(str(b)+","+ str(a)+"\n")
+        b+=1
     f.close()
     return
 
@@ -387,11 +392,12 @@ X_test_scaled=data_scaling(scaler,X)
 print("data is scaled")
 model=train_model(X_scaled,y)
 print("model is trained")
-kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.txt")
+kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
 print("file is made with predictions")
 endtime=time.time()
 print("the model is trained en data is predicted")
 print("this took " + str(endtime-starttime) + "seconds")
+
 def data_cleaning(data):
     """Input data matrix"""
     
