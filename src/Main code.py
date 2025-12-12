@@ -302,7 +302,7 @@ def make_data_sources_dict(X_train_raw, y_train):
                             'Cleaned+scaled+transformed':X_train_transformed_cleaned, 'Scaled+transformed':X_train_transformed}
     return data_sources_dict
 
-def test_data_source(data_sources_dict, y_train):
+def best_data_source(data_sources_dict, y_train):
     """tries multiple data sources specified in data_sources_dict to determine the best one using cross-validation"""
     for data_source in range(len(data_sources_dict)):                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
         current_X_train = list(data_sources_dict.values())[data_source]          #the current X_train
@@ -321,7 +321,7 @@ X,y = combining_all_features_training('data/train.csv')
 train_set, validation_set = splittingdata(X, y, 0.2)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
 X_train_raw, y_train = train_set
 data_sources_dict = make_data_sources_dict(X_train_raw, y_train)
-test_data_source(data_sources_dict, y_train)
+best_data_source(data_sources_dict, y_train)
 
 
 def kaggle_submission(X_test,model,filename):
