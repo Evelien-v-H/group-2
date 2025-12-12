@@ -287,9 +287,12 @@ def combining_all_features_test(datafile):
 
 def fit_PCA(X, n_components=None):
     """performs a PCA on the data in X (np.array) and 
-    returns the features transformed onto the principal component feature space as X_reduced (np.array)"""
-    X_reduced, variance_per_pc = sklearn.decomposition.PCA(n_components=n_components).fit_transform(X)
-    return X_reduced, variance_per_pc
+    returns the features transformed onto the principal component feature space as X_scores (np.array of shape (n_samples, n_components))
+    Input parameter n_components has default value None, meaning it keeps all principal components by default"""
+    pca = sklearn.decomposition.PCA(n_components=n_components)
+    X_scores = pca.fit_transform(X)
+    variance_per_pc = pca.explained_variance_ratio_
+    return X_scores, variance_per_pc
 
 #Onderstaande 2 functies zijn voor ons eigen gebruik, voor als we gaan testen welke data source het beste is (Iris, vrijdagavond)
 def make_data_sources_dict(X_train_raw):
@@ -306,16 +309,16 @@ def make_data_sources_dict(X_train_raw):
     
     scaler = set_scaling(X_train_raw)
     X_train_scaled = data_scaling(scaler, X_train_raw)
-    X_train_all_pc, variance_per_pc = fit_PCA(X_train_scaled)
-    X_train_pca66 = select_principal_components(X_train_all_pc, variance_per_pc, 0.66)
-    X_train_pca80 = select_principal_components(X_train_all_pc, variance_per_pc, 0.80)
-    X_train_pca95 =select_principal_components(X_train_all_pc, variance_per_pc, 0.95)
+    X_train_pc_scores, variance_per_pc = fit_PCA(X_train_scaled)
+    X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
+    X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
+    X_train_pca95 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.95)
     X_train_cleaned = data_cleaning(X_train_raw)
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
-    X_train_cleaned_all_pc, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
-    X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_all_pc, variance_per_pc_cleaned, 0.66)
-    X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_all_pc, variance_per_pc_cleaned, 0.80)
-    X_train_cleaned_pca95 =select_principal_components(X_train_cleaned_all_pc, variance_per_pc_cleaned, 0.95)
+    X_train_cleaned_pc_scores, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
+    X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.66)
+    X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.80)
+    X_train_cleaned_pca95 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.95)
 
     data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled, 
                          'Scaled+pca66':X_train_pca66, 'Scaled+pca80':X_train_pca80, 'Scaled+pca95':X_train_pca95,
@@ -324,10 +327,9 @@ def make_data_sources_dict(X_train_raw):
 
 def best_data_source(data_sources_dict, y_train):
     """tries multiple data sources specified in data_sources_dict to determine the best one using cross-validation"""
-    for data_source in range(len(data_sources_dict)):                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        current_X_train = list(data_sources_dict.values())[data_source]          #the current X_train
-        current_data_source = list(data_sources_dict.keys())[data_source]        #the key from the dictionary of the current X_train
-        clf = sklearn.ensemble.RandomForestRegressor(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+    highest_cv_score = 0
+    for current_data_source, current_X_train in data_sources_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
+        clf = sklearn.ensemble.RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         mean_cv_score = sklearn.model_selection.cross_val_score(clf, current_X_train, y_train, cv=5).mean()
@@ -347,17 +349,17 @@ def data_sources_training():
     best_data_source(data_sources_dict, y_train)
     return
 
-def select_principal_components(all_principal_components, variance_explained, goal_cumulative_variance):
-    """from the input array all_principal_components, creates a new array relevant_principle_components, which is a subset
-    of the input array that includes all relevant PCs to reach the goal_cumulative_variance. variance_explained is a np.array
-    of shape (n_principal_components,) returned by the function fit_PCA that contains the portion of variance explained by each
-     principal component."""
+def select_principal_components(X_pca_scores, variance_explained, goal_cumulative_variance):
+    """from the input array X_pca_scores, creates a new array relevant_principle_components, which is a subset
+    of the input array that includes only the relevant PCs to reach the goal_cumulative_variance. 
+    variance_explained is a np.array of shape (n_principal_components,) 
+    returned by the function fit_PCA that contains the portion of variance explained by each principal component."""
     cumulative_variance = 0
     pc = 0
     while cumulative_variance < goal_cumulative_variance:
         cumulative_variance += variance_explained[pc]
         pc += 1
-    relevant_principal_components = all_principal_components[:pc, :]
+    relevant_principal_components = X_pca_scores[:, :pc]
     return relevant_principal_components
 
 
@@ -465,14 +467,15 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-def make_pca_plots(all_pc):
-    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. Input parameter: all_pc (np.array): all principal components"""
+def make_pca_plots(pca_scores):
+    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
+    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space."""
     fig, (ax1,ax2,ax3) = plt.subplots(3)
     fig.suptitle('Principal component plots on cleaned and scaled training data')
-    ax1.scatter(all_pc[0],all_pc[1])
-    ax1.set(xlabel='First PC',ylabel='Second PC')
-    ax2.scatter(all_pc[0],all_pc[2])
-    ax2.set(xlabel='First PC',ylabel='Third PC')
-    ax3.scatter(all_pc[1],all_pc[2])
-    ax3.set(xlabel='Second PC',ylabel='Third PC')
+    ax1.scatter(pca_scores[:,0],pca_scores[:,1])
+    ax1.set(xlabel='First PC explained variance',ylabel='Second PC explained variance')
+    ax2.scatter(pca_scores[:,0],pca_scores[:,2])
+    ax2.set(xlabel='First PC explained variance',ylabel='Third PC explained variance')
+    ax3.scatter(pca_scores[:,1],pca_scores[:,2])
+    ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
