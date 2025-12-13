@@ -10,6 +10,7 @@ from rdkit import DataStructs
 from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
 from rdkit.Chem import GraphDescriptors
+from rdkit.Chem import rdFingerprintGenerator
 
 import peptidy as pep
 
@@ -83,8 +84,6 @@ class small_molecule:
         self.molecule=Chem.MolFromSmiles(str(SMILES))
 
 
-
-
     def rdkit_descriptor(self):
         """This function returns an array with all sorts of descriptors gotten from rdkit
         
@@ -105,7 +104,47 @@ class small_molecule:
         
         return array
 
+    def topological_fingerprints(self):
+        """This function gets the topological fingerprints of an molecule
+        
+        input: self 
+        
+        output: an array"""
+        topfingergen = AllChem.GetRDKitFPGenerator(fpSize=2048)
+        topfinger = topfingergen.GetFingerprint(self.molecule)
+        array = np.zeros((topfinger.GetNumBits(),), dtype=int)
+        DataStructs.ConvertToNumpyArray(topfinger, array)
+        return array
+    
+    def morgan_fingerprint(self,radius=2,nBits=1024):
+        """Returns a Morgan fingerprint as a NumPy array.
 
+        input: self for self.molecule, radius is an integer and defines the radius what it uses of the molecule
+        nBits is an integer and defines length of the fingerprint vector
+
+        output an array
+        """
+        morgan_generator = rdFingerprintGenerator.GetMorganGenerator(radius=radius, fpSize=nBits)
+    
+        # Generate the fingerprint (bit vector)
+        fingerprint = morgan_generator.GetFingerprint(self.molecule)
+    
+        # Convert to numpy array
+        array = np.zeros((nBits,), dtype=int)
+        AllChem.DataStructs.ConvertToNumpyArray(fingerprint, array)
+    
+        return array
+    
+    def macckeys(self):
+        """This function gets the macckeys of an molecule
+        
+        input: self 
+        
+        output: an array"""
+        macckeys = MACCSkeys.GenMACCSKeys(self.molecule)
+        array = np.zeros((macckeys.GetNumBits(),), dtype=int)
+        DataStructs.ConvertToNumpyArray(macckeys, array)
+        return array
     
 class protein:
     def __init__(self, uniprot_id, dict):
@@ -448,4 +487,7 @@ def make_pca_plots(pca_scores):
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
 
+SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID('data/train.csv')
+SMILE=SMILES[0]
+molecule=small_molecule(SMILE)
 
