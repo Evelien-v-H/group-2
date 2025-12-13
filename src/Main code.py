@@ -1,4 +1,4 @@
-run=True
+run=False
 
 import pandas as pd
 import numpy as np
@@ -30,29 +30,31 @@ def open_data(datafile):
     return df
 
 
-def data_training_splitting(datafile):
-    """This function splits the dataset in a SMILES array, UNIProt_ID and a affinity score. 
+def data_to_SMILES_UNIProt_ID(datafile):
+    """This function splits the dataset in a SMILES array and UNIProt_ID. If the datafile is an trainset than also an affinityscore 
         
-        input: a csv file like the given trainingset. The first colom is the SMILES-string, the second colom is the UNIProt_ID and the third 
-        Colom is the affinity score
-        
-        Output: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore"""
+        input: a csv file like the given training or testset with 3 coloms. (trainset: first colom:SMILES, second colom:UNIProt_ID, third colom: affinity)
+        (testset: first colom:numbers, second colom:SMILES, third colom:UNIProt_ID)
+    
+        Output: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore, if it is the testset the
+        affinityscore is returned with 'unknown affinity'"""
     df=open_data(datafile)
-    SMILES=df.iloc[:,0].to_numpy()
-    UNIProt_ID=df.iloc[:,1].to_numpy()
-    affinity=df.iloc[:,2].to_numpy()
+    colom_1=df.iloc[:,0].to_numpy()
+    colom_2=df.iloc[:,1].to_numpy()
+    colom_3=df.iloc[:,2].to_numpy()
+
+    if colom_1[0]=="0":
+        SMILES=colom_2
+        UNIProt_ID=colom_3
+        affinity='unknown affinity'
+    
+    else:
+        SMILES=colom_1
+        UNIProt_ID=colom_2
+        affinity=colom_3
+
     return SMILES,UNIProt_ID,affinity
 
-def data_test_splitting(datafile):
-    """This function splits the dataset in a SMILES array, UNIProt_ID and a affinity score. 
-        
-        input: a csv file like the given testset. The first colom is the SMILES-string and the second colom is the UNIProt_ID
-        
-        Output: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore"""
-    df=open_data(datafile)
-    SMILES=df.iloc[:,1].to_numpy()
-    UNIProt_ID=df.iloc[:,2].to_numpy()
-    return SMILES,UNIProt_ID
 
 def extract_sequence(document):
     """input is a doc but the document earlier made should be in the format of:
@@ -231,14 +233,14 @@ def RF_error(model, X_test, y_test):
     as a float."""
     return model.score(X_test,y_test)
     
-def combining_all_features_training(datafile):
+def combining_all_features(datafile):
     """This functions makes an matrix with the descriptors from the ligands and proteins in the file
     
-    Input: csv-file with a format of the training set (colom 1:SMILES, colom 2:UNIProt_ID, colom 3:affinity)
+    Input: csv-file with a format of the trainingset (trainset: first colom:SMILES, second colom:UNIProt_ID, third colom: affinity) or testset(first colom:numbers, second colom:SMILES, third colom:UNIProt_ID)
     
     Output: matrix (n_samples*n_features) and affinity (np.array of length n_samples)
     """
-    SMILES,UNIProt_ID,affinity=data_training_splitting(datafile)
+    SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID(datafile)
     uniprot_dict=extract_sequence("data/protein_info.csv")
     for i in range(len(SMILES)):
         ligand=small_molecule(SMILES[i])
@@ -256,34 +258,6 @@ def combining_all_features_training(datafile):
 
     return matrix,affinity
 
-def combining_all_features_test(datafile):
-    """This functions makes an matrix with the descriptors from the ligands and proteins in the file
-    
-    Input: csv-file with a format of the testset (colom 1:SMILES, colom 2:UNIProt_ID)
-    
-    Output: matrix (samples*features)
-    """
-    SMILES,UNIProt_ID=data_test_splitting(datafile)
-    uniprot_dict=extract_sequence("data/protein_info.csv")
-    print(SMILES,UNIProt_ID)
-    for i in range(len(SMILES)):
-        ligand=small_molecule(SMILES[i])
-        ligand_features=ligand.rdkit_descriptor()
-
-        peptide=protein(UNIProt_ID[i],uniprot_dict)
-        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
-        peptide_features=np.array(peptide_features_list)
-        
-        all_features=np.concatenate((ligand_features, peptide_features))
-
-
-        if i==0:
-            matrix=all_features
-        
-        else:
-            matrix=np.vstack((matrix,all_features))
-    
-    return matrix
 
 def fit_PCA(X, n_components=None):
     """performs a PCA on the data in X (np.array) and 
@@ -342,7 +316,7 @@ def best_data_source(data_sources_dict, y_train):
 
 #Code voor Iris om te testen welke data source het beste is
 def data_sources_training():
-    X,y = combining_all_features_training('data/train.csv')
+    X,y = combining_all_features('data/train.csv')
     train_set, validation_set = splittingdata(X, y, 0.2)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
     X_train_raw, y_train = train_set
     data_sources_dict = make_data_sources_dict(X_train_raw)
@@ -392,8 +366,8 @@ def data_cleaning(data):
 if run is True:                
     starttime=time.time()
     print("started")
-    X,y=combining_all_features_training("data/train.csv")
-    X_test=combining_all_features_test("data/test.csv")
+    X,y=combining_all_features("data/train.csv")
+    X_test,unknown_affinity=combining_all_features("data/test.csv")
     print("data is prepared")
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
@@ -428,6 +402,8 @@ def data_cleaning(data):
             if is_number(data[j,i]) is True:
                 if float(data[j,i])>=np.finfo(np.float32).max:
                     raise ValueError("You're value is to big for the float32 of the random forest. Solve this manual")
+                else:
+                    data[j,i]=float(data[j,i])
             
             else:
                 if already_errorvalue is False:
@@ -435,9 +411,7 @@ def data_cleaning(data):
                     for k in range(data.shape[0]):
                         if is_number(data[k,i]) is True:
                             values_colom.append(float(data[k,i]))
-                            print(values_colom)
                     
-                    print(len(values_colom))
                     if len(values_colom)!=0:
                         mean_value_colom=np.mean(values_colom)
                         data[j,i]=float(mean_value_colom)
@@ -454,6 +428,7 @@ def data_cleaning(data):
     if len(irrelevant_colums)>0:
         irrelevant_colums.reverse()
         for n in irrelevant_colums:
+            print('a feature is deleted colom:',n)
             data = np.delete(data, n, axis=1)
 
     return data
@@ -479,3 +454,5 @@ def make_pca_plots(pca_scores):
     ax3.scatter(pca_scores[:,1],pca_scores[:,2])
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
+
+
