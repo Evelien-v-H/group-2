@@ -1,4 +1,4 @@
-run=False
+run=True
 
 import pandas as pd
 import numpy as np
@@ -350,18 +350,6 @@ def kaggle_submission(X_test,model,filename):
     return
 
 
-def data_cleaning(data):
-    """Input data matrix"""
-    
-    for i in range(data.shape[1]):
-        print('b')
-        for j in range(data.shape[0]):
-            if isinstance(data[j, i], (float, int)) and not np.isnan(data[j,i]):
-                if 0==1:
-                    print('a')
-            else:
-                print(j,i)
-                print(data[j,i])
                 
 if run is True:                
     starttime=time.time()
@@ -434,6 +422,11 @@ def data_cleaning(data):
     return data
 
 def check_matrix(X):
+    """CHecks if there are values in a matrix an random forest can crash on. This is an function for ourselves to control this if we get an error
+    
+    input matrix
+    
+    There is no output"""
     print(X)
     print('a')
     print("Heeft NaN:", np.isnan(X).any())
