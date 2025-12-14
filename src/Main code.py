@@ -172,40 +172,21 @@ class protein:
         return peptidy_features_list
 
 
-def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
-    #ja er komt een uitleg wat alles is en ik ga nog selecteren wat relevant is, dit zijn de standaard waarde van de makers van het model
-    #Ik kan doordat ik dit tijdens de datacombinatie gaan doen omdat ik daar errors had nu niet de X,y die daaruit komt gebruiken dus die eventuele errors zal ik nog op moeten lossen
-
-    #n_estimators is het aantal bomen dat je wilt gaan gebruiken, dit lijkt mij relevant
-    #criterion, dit is de Loss functie die je gebruikt om op zoek te gaan naar de beste boom,
-    #Max_depth De maximum depth van de boom, je kan dus ook het maximum qua aantal takken voorstellen. Dit is iets anders dan de minimum aantal samples per afsplitsing. Dit is een hyperparameter die we uit zullen moeten gaan testen
-    #min_samples_split minimaal aantal samples per split, dit is een hyperparameter die we sws moeten gaan testen
-    #min_samples_leaf, minimaal aantal samples die nodig zijn bij een leaf node, dus met hoeveel je uiteindelijk een keus maakt --> ook testen
-    #max_features, waordt er gekenen naar het maximaal aantal features die een boom gebruikt om een boom te maken --> redelijk relevant, miss ook voor featureselection
-    #bootstrap --> is relevant, moet aanstaan
-    #random_state --> kan denk ik wel nuttig zijn tijdens het testen, maar ook half
-
-
-    #oob_scire --> out of bag, kan relevant miss ook in plaats van crossvalidation
-    #max_samples --> kan relevant zijn, maar ik zou dit niet als eerste testen, als je het niet test is dat denk ik ook prima
-
-    #min_weight_fraction_leaf --> is een andere methode van het aantal uiteindelijk samples bepalen, hoeft niet uitgetest te worden
-    #max_leaf_nodes wordt gekeken naar hoeveel leafs er maximaal zijn, kan je denk ik beter met andere features doen
-    #min_impurity_decrease, de minimale verbetering --> ik denk dat dit heel lastig is, voorkomt miss overfitting, maar ik denk dat dit te veel extra is
-    #n_jobs, hij gaat dan meerdere dingen tegelijk doen, is denk ik niet heel relevant
-    #verbose, niet heel nuttig geeft je eventueel meer inzicht over hoever die is
-    #warm_start --> herbruikt dan de vorige call om beter te fitten, maar ik denk dat wij dit juist niet willen
-    #ccp_alpha --> kan gebruikt worden voor overfitten maar is denk ik nu onnodig complex
-    #monotonic_cst, je kan beperkingen aan de richting van invloed van features, is denk ik onnodig ingewikkeld
+def train_model(X,y,n_estimators=100,   max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                 max_features=1.0,   bootstrap=True, random_state=None,  max_samples=None, ):
+    """Trains the model
+      
+    Input:X is the matrix with features and samples, y is the affinityscore in an array which is coupled with the sample
+    n_estimators is how many trees you want to use, this needs to be an integer, Max_depth is the maximum dept of the tree this is 
+    an integer or None, min_samples_split this is an integer or float with how many samples are needed per split. Min_samples_leaf are the samples you need
+    for a leaf node also an integer or fload, max_features how many features are used to make a tree integer or float, bootstrap is True or False, Random_state is integer or false,
+    Max_samples is an integer, float or None.
     
+    Output: A random forest model  """
 
-    random_forest=sklearn.ensemble.RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, 
-                                                         min_samples_leaf=min_samples_leaf,min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features, 
-                                                         max_leaf_nodes=max_leaf_nodes, min_impurity_decrease=min_impurity_decrease, bootstrap=bootstrap, 
-                                                        oob_score=oob_score, n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start, 
-                                                        ccp_alpha=ccp_alpha, max_samples=max_samples, monotonic_cst=monotonic_cst)
+    random_forest=sklearn.ensemble.RandomForestRegressor(n_estimators=n_estimators,   max_depth=max_depth, min_samples_split=min_samples_split, 
+                                                         min_samples_leaf=min_samples_leaf, max_features=max_features, bootstrap=bootstrap, 
+                                                        random_state=random_state,  max_samples=max_samples)
     random_forest.fit(X,y)
     return random_forest
 
@@ -389,7 +370,7 @@ def kaggle_submission(X_test,model,filename):
     return
 
 
-                
+#This if statement is really usefull if you want to work on other parts of the code                
 if run is True:                
     starttime=time.time()
     print("started")
@@ -409,6 +390,11 @@ if run is True:
     print("this took " + str(endtime-starttime) + "seconds")
 
 def is_number(val):
+    """This function checks if the value is a number and can be an float
+    
+    input: can be anything
+    
+    Output: True or False"""
     try:
         float(val)
         return True
