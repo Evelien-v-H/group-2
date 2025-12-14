@@ -356,7 +356,7 @@ def best_data_source(data_sources_dict, y_train):
 #Code voor Iris om te testen welke data source het beste is
 def data_sources_training():
     X,y = combining_all_features('data/train.csv')
-    train_set, validation_set = splittingdata(X, y, 0.2)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+    train_set, validation_set = splittingdata(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
     X_train_raw, y_train = train_set
     data_sources_dict = make_data_sources_dict(X_train_raw)
     best_data_source(data_sources_dict, y_train)
