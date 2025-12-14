@@ -496,10 +496,10 @@ def grid_search(X,y,param_grids):
     Returns the model fitted to the optimal combination of parameters
     """
     model = RandomForestRegressor()
-    estimator = GridSearchCV(model, param_grids, verbose=1.1, n_jobs=-2, refit=True)       #verbose controls how many intermediate messages are printed, does not impact outcome
+    estimator = GridSearchCV(model, param_grids, verbose=1.1, n_jobs=-2, refit=True, cv=5)       #verbose controls how many intermediate messages are printed, does not impact outcome
     estimator.fit(X,y)
     best_estimator = estimator.best_estimator_
-    return best_estimator.get_params
+    return best_estimator.get_params()
 
 def hyperparameter_tuning(X,y):
     """function that can be used to tune the hyperparameters"""
@@ -520,17 +520,19 @@ if run is True:
     starttime=time.time()
     print("started")
     X,y=combining_all_features("data/train.csv")
-    X_test,unknown_affinity=combining_all_features("data/test.csv")
+    # X_test,unknown_affinity=combining_all_features("data/test.csv")
     print("data is prepared")
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
-    X_test_scaled=data_scaling(scaler,X_test)
+    # X_test_scaled=data_scaling(scaler,X_test)
     print("data is scaled")
-    model=train_model(X_scaled,y)
-    print("model is trained")
-    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
-    print("file is made with predictions")
-    endtime=time.time()
-    print("the model is trained en data is predicted")
-    print("this took " + str(endtime-starttime) + "seconds")
+    hyperparameter_tuning(X_scaled,y)
+    # # model=train_model(X_scaled,y)
+    # print("model is trained")
+    # kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    # print("file is made with predictions")
+    # endtime=time.time()
+    # print("the model is trained en data is predicted")
+    total_time = time.time()-starttime
+    print(f"this took {total_time} seconds, which is {total_time/60} minutes")
 
