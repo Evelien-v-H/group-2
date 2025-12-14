@@ -317,7 +317,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     Input:X is the matrix with features and samples, y is the affinityscore in an array which is coupled with the sample
     n_estimators is how many trees you want to use, this needs to be an integer, Max_depth is the maximum dept of the tree this is 
     an integer or None, min_samples_split this is an integer or float with how many samples are needed per split. Min_samples_leaf are the samples you need
-    for a leaf node also an integer or fload, max_features how many features are used to make a tree integer or float, bootstrap is True or False, Random_state is integer or false,
+    for a leaf node also an integer or fload, max_features how many features are used to make a tree can be sqrt, log2, none, bootstrap is True or False, Random_state is integer or false,
     Max_samples is an integer, float or None.
     
     Output: A random forest model  """
