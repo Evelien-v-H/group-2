@@ -2,6 +2,7 @@ run=True
 
 import pandas as pd
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 
 from rdkit import Chem
@@ -172,52 +173,12 @@ class protein:
         return peptidy_features_list
 
 
-def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
-    #ja er komt een uitleg wat alles is en ik ga nog selecteren wat relevant is, dit zijn de standaard waarde van de makers van het model
-    #Ik kan doordat ik dit tijdens de datacombinatie gaan doen omdat ik daar errors had nu niet de X,y die daaruit komt gebruiken dus die eventuele errors zal ik nog op moeten lossen
-
-    #n_estimators is het aantal bomen dat je wilt gaan gebruiken, dit lijkt mij relevant
-    #criterion, dit is de Loss functie die je gebruikt om op zoek te gaan naar de beste boom,
-    #Max_depth De maximum depth van de boom, je kan dus ook het maximum qua aantal takken voorstellen. Dit is iets anders dan de minimum aantal samples per afsplitsing. Dit is een hyperparameter die we uit zullen moeten gaan testen
-    #min_samples_split minimaal aantal samples per split, dit is een hyperparameter die we sws moeten gaan testen
-    #min_samples_leaf, minimaal aantal samples die nodig zijn bij een leaf node, dus met hoeveel je uiteindelijk een keus maakt --> ook testen
-    #max_features, waordt er gekenen naar het maximaal aantal features die een boom gebruikt om een boom te maken --> redelijk relevant, miss ook voor featureselection
-    #bootstrap --> is relevant, moet aanstaan
-    #random_state --> kan denk ik wel nuttig zijn tijdens het testen, maar ook half
-
-
-    #oob_scire --> out of bag, kan relevant miss ook in plaats van crossvalidation
-    #max_samples --> kan relevant zijn, maar ik zou dit niet als eerste testen, als je het niet test is dat denk ik ook prima
-
-    #min_weight_fraction_leaf --> is een andere methode van het aantal uiteindelijk samples bepalen, hoeft niet uitgetest te worden
-    #max_leaf_nodes wordt gekeken naar hoeveel leafs er maximaal zijn, kan je denk ik beter met andere features doen
-    #min_impurity_decrease, de minimale verbetering --> ik denk dat dit heel lastig is, voorkomt miss overfitting, maar ik denk dat dit te veel extra is
-    #n_jobs, hij gaat dan meerdere dingen tegelijk doen, is denk ik niet heel relevant
-    #verbose, niet heel nuttig geeft je eventueel meer inzicht over hoever die is
-    #warm_start --> herbruikt dan de vorige call om beter te fitten, maar ik denk dat wij dit juist niet willen
-    #ccp_alpha --> kan gebruikt worden voor overfitten maar is denk ik nu onnodig complex
-    #monotonic_cst, je kan beperkingen aan de richting van invloed van features, is denk ik onnodig ingewikkeld
-    
-
-    random_forest=sklearn.ensemble.RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, 
-                                                         min_samples_leaf=min_samples_leaf,min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features, 
-                                                         max_leaf_nodes=max_leaf_nodes, min_impurity_decrease=min_impurity_decrease, bootstrap=bootstrap, 
-                                                        oob_score=oob_score, n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start, 
-                                                        ccp_alpha=ccp_alpha, max_samples=max_samples, monotonic_cst=monotonic_cst)
-    random_forest.fit(X,y)
-    return random_forest
-
-
-def splittingdata(X_train, y_train, percentage):
+def split_train_validation(X_train, y_train, percentage):
     """This function splits the data randomly into training data set and a validation
     data set. These training and validation set are returned as a tuple of 2 tuples
     as (X_training,y_training),(X_validation, y_validation). It splits the the data in
     two with the percentage to determine how big training data set is. Percentage is
     a float between 1 and 0."""
-    import numpy as np
-    import random
 
     #calculates trainingsize with percentage
     n_samples, n_features= X_train.shape
@@ -241,172 +202,6 @@ def splittingdata(X_train, y_train, percentage):
     validation=(X_validation,y_validation)
 
     return training,validation
-
-def set_scaling(X):
-    """makes the scaler, from given data set X. the scaler used
-    is a minmax scaler. it returns a object with a fixed scaler"""
-    scaler=sklearn.preprocessing.MinMaxScaler()
-    return scaler.fit(X)
-
-def data_scaling(scaler, X):
-    """transforms data from fixed scalar. input is the fixed scaler
-    and the data that need to be scaled. the output is th scaled data"""
-    return scaler.transform(X)
-
-def RF_fitting(X_train, y_train):
-    """fits a random forest to a X_train and a y_train. input is a
-    dataset with X_train and y_train in an array. output is the fitted
-    model of the randomforest."""
-    model= sklearn.ensemble.RandomForestRegressor()
-    return model.fit(X_train,y_train)
-
-def RF_predict(model, X_test):
-    """uses a defined model to predict the y values of X_test. input
-    is an array X_test and the defined model. output is an array of 
-    the predicted y values"""
-    return model.predict(X_test)
-
-def RF_error(model, X_test, y_test):
-    """uses R2 to calculate the error of the model. input is a defined
-    model, an array X_test and an array y_test. the output is a error
-    as a float."""
-    return model.score(X_test,y_test)
-    
-def combining_all_features(datafile):
-    """This functions makes an matrix with the descriptors from the ligands and proteins in the file
-    
-    Input: csv-file with a format of the trainingset (trainset: first colom:SMILES, second colom:UNIProt_ID, third colom: affinity) or testset(first colom:numbers, second colom:SMILES, third colom:UNIProt_ID)
-    
-    Output: matrix (n_samples*n_features) and affinity (np.array of length n_samples)
-    """
-    SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID(datafile)
-    uniprot_dict=extract_sequence("data/protein_info.csv")
-    for i in range(len(SMILES)):
-        ligand=small_molecule(SMILES[i])
-        ligand_features=ligand.rdkit_descriptor()
-
-        peptide=protein(UNIProt_ID[i], uniprot_dict)
-        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
-        peptide_features=np.array(peptide_features_list)
-        all_features=np.concatenate((ligand_features, peptide_features))
-        if i==0:
-            matrix=all_features
-        
-        else:
-            matrix=np.vstack((matrix,all_features))
-
-    return matrix,affinity
-
-
-def fit_PCA(X, n_components=None):
-    """performs a PCA on the data in X (np.array) and 
-    returns the features transformed onto the principal component feature space as X_scores (np.array of shape (n_samples, n_components))
-    Input parameter n_components has default value None, meaning it keeps all principal components by default"""
-    pca = sklearn.decomposition.PCA(n_components=n_components)
-    X_scores = pca.fit_transform(X)
-    variance_per_pc = pca.explained_variance_ratio_
-    return X_scores, variance_per_pc
-
-#Onderstaande 2 functies zijn voor ons eigen gebruik, voor als we gaan testen welke data source het beste is (Iris, vrijdagavond)
-def make_data_sources_dict(X_train_raw):
-    """applies cleaning, scaling, and pca where relevant.
-    returns the dictionary that can be used for the test_data_source function. 
-    This dictionary includes all data that will be tried for selecting the best input data:
-        - scaled
-        - cleaned (= outliers removed)
-        - cleaned + scaled
-        - scaled and transformed into pca feature space with enough features to explain 60% of variance
-        - scaled and transformed, 80%
-        - scaled and transformed, 95%
-        - the previous three but with the cleaning step"""
-    
-    scaler = set_scaling(X_train_raw)
-    X_train_scaled = data_scaling(scaler, X_train_raw)
-    X_train_pc_scores, variance_per_pc = fit_PCA(X_train_scaled)
-    X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
-    X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
-    X_train_pca95 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.95)
-    X_train_cleaned = data_cleaning(X_train_raw)
-    X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
-    X_train_cleaned_pc_scores, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
-    X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.66)
-    X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.80)
-    X_train_cleaned_pca95 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.95)
-
-    data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled, 
-                         'Scaled+pca66':X_train_pca66, 'Scaled+pca80':X_train_pca80, 'Scaled+pca95':X_train_pca95,
-                         'Cleaned+scaled+pca66':X_train_cleaned_pca66, 'Cleaned+scaled+pca80':X_train_cleaned_pca80, 'Cleaned+scaled+pca95':X_train_cleaned_pca95}
-    return data_sources_dict
-
-def best_data_source(data_sources_dict, y_train):
-    """tries multiple data sources specified in data_sources_dict to determine the best one using cross-validation"""
-    highest_cv_score = 0
-    for current_data_source, current_X_train in data_sources_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        clf = sklearn.ensemble.RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
-        mean_cv_score = sklearn.model_selection.cross_val_score(clf, current_X_train, y_train, cv=5).mean()
-        print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
-        if mean_cv_score > highest_cv_score:        
-            highest_cv_score = mean_cv_score
-            best_data_source = current_data_source          #keeps track of the best data source thus far
-    print(f'The best data source is {best_data_source}')
-
-
-#Code voor Iris om te testen welke data source het beste is
-def data_sources_training():
-    X,y = combining_all_features('data/train.csv')
-    train_set, validation_set = splittingdata(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
-    X_train_raw, y_train = train_set
-    data_sources_dict = make_data_sources_dict(X_train_raw)
-    best_data_source(data_sources_dict, y_train)
-    return
-
-def select_principal_components(X_pca_scores, variance_explained, goal_cumulative_variance):
-    """from the input array X_pca_scores, creates a new array relevant_principle_components, which is a subset
-    of the input array that includes only the relevant PCs to reach the goal_cumulative_variance. 
-    variance_explained is a np.array of shape (n_principal_components,) 
-    returned by the function fit_PCA that contains the portion of variance explained by each principal component."""
-    cumulative_variance = 0
-    pc = 0
-    while cumulative_variance < goal_cumulative_variance:
-        cumulative_variance += variance_explained[pc]
-        pc += 1
-    relevant_principal_components = X_pca_scores[:, :pc]
-    return relevant_principal_components
-
-
-def kaggle_submission(X_test,model,filename):
-    affinity_array=RF_predict(model, X_test)
-    f=open(filename,'w')
-    print(filename+" is made")
-    f.write("ID,affinity_score")
-    b=0
-    for a in affinity_array:
-        f.write("\n"+str(b)+","+ str(a))
-        b+=1
-    f.close()
-    return
-
-
-                
-if run is True:                
-    starttime=time.time()
-    print("started")
-    X,y=combining_all_features("data/train.csv")
-    X_test,unknown_affinity=combining_all_features("data/test.csv")
-    print("data is prepared")
-    scaler=set_scaling(X)
-    X_scaled=data_scaling(scaler,X)
-    X_test_scaled=data_scaling(scaler,X_test)
-    print("data is scaled")
-    model=train_model(X_scaled,y)
-    print("model is trained")
-    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
-    print("file is made with predictions")
-    endtime=time.time()
-    print("the model is trained en data is predicted")
-    print("this took " + str(endtime-starttime) + "seconds")
 
 def is_number(val):
     try:
@@ -474,19 +269,6 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-def make_pca_plots(pca_scores):
-    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
-    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space."""
-    fig, (ax1,ax2,ax3) = plt.subplots(3)
-    fig.suptitle('Principal component plots on cleaned and scaled training data')
-    ax1.scatter(pca_scores[:,0],pca_scores[:,1])
-    ax1.set(xlabel='First PC explained variance',ylabel='Second PC explained variance')
-    ax2.scatter(pca_scores[:,0],pca_scores[:,2])
-    ax2.set(xlabel='First PC explained variance',ylabel='Third PC explained variance')
-    ax3.scatter(pca_scores[:,1],pca_scores[:,2])
-    ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
-    plt.show()
-
 def clipping_outliers(matrix,percentile_low=5,percentile_high=95):
     """This function changes outliers to the highest possible not outlier value, percentile_low, the smallest percentile,percentile_high, highest percentile both must be integers
     
@@ -505,5 +287,216 @@ def clipping_outliers(matrix,percentile_low=5,percentile_high=95):
     return matrix_output
 
 
+def set_scaling(X):
+    """makes the scaler, from given data set X. the scaler used
+    is a minmax scaler. it returns a object with a fixed scaler"""
+    scaler=sklearn.preprocessing.MinMaxScaler()
+    return scaler.fit(X)
 
+def data_scaling(scaler, X):
+    """transforms data from fixed scalar. input is the fixed scaler
+    and the data that need to be scaled. the output is th scaled data"""
+    return scaler.transform(X)
+
+def RF_predict(model, X_test):
+    """uses a defined model to predict the y values of X_test. input
+    is an array X_test and the defined model. output is an array of 
+    the predicted y values"""
+    return model.predict(X_test)
+
+def RF_error(model, X_test, y_test):
+    """uses R2 to calculate the error of the model. input is a defined
+    model, an array X_test and an array y_test. the output is a error
+    as a float."""
+    return model.score(X_test,y_test)
+
+def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
+    #ja er komt een uitleg wat alles is en ik ga nog selecteren wat relevant is, dit zijn de standaard waarde van de makers van het model
+    #Ik kan doordat ik dit tijdens de datacombinatie gaan doen omdat ik daar errors had nu niet de X,y die daaruit komt gebruiken dus die eventuele errors zal ik nog op moeten lossen
+
+    #n_estimators is het aantal bomen dat je wilt gaan gebruiken, dit lijkt mij relevant
+    #criterion, dit is de Loss functie die je gebruikt om op zoek te gaan naar de beste boom,
+    #Max_depth De maximum depth van de boom, je kan dus ook het maximum qua aantal takken voorstellen. Dit is iets anders dan de minimum aantal samples per afsplitsing. Dit is een hyperparameter die we uit zullen moeten gaan testen
+    #min_samples_split minimaal aantal samples per split, dit is een hyperparameter die we sws moeten gaan testen
+    #min_samples_leaf, minimaal aantal samples die nodig zijn bij een leaf node, dus met hoeveel je uiteindelijk een keus maakt --> ook testen
+    #max_features, waordt er gekenen naar het maximaal aantal features die een boom gebruikt om een boom te maken --> redelijk relevant, miss ook voor featureselection
+    #bootstrap --> is relevant, moet aanstaan
+    #random_state --> kan denk ik wel nuttig zijn tijdens het testen, maar ook half
+
+
+    #oob_scire --> out of bag, kan relevant miss ook in plaats van crossvalidation
+    #max_samples --> kan relevant zijn, maar ik zou dit niet als eerste testen, als je het niet test is dat denk ik ook prima
+
+    #min_weight_fraction_leaf --> is een andere methode van het aantal uiteindelijk samples bepalen, hoeft niet uitgetest te worden
+    #max_leaf_nodes wordt gekeken naar hoeveel leafs er maximaal zijn, kan je denk ik beter met andere features doen
+    #min_impurity_decrease, de minimale verbetering --> ik denk dat dit heel lastig is, voorkomt miss overfitting, maar ik denk dat dit te veel extra is
+    #n_jobs, hij gaat dan meerdere dingen tegelijk doen, is denk ik niet heel relevant
+    #verbose, niet heel nuttig geeft je eventueel meer inzicht over hoever die is
+    #warm_start --> herbruikt dan de vorige call om beter te fitten, maar ik denk dat wij dit juist niet willen
+    #ccp_alpha --> kan gebruikt worden voor overfitten maar is denk ik nu onnodig complex
+    #monotonic_cst, je kan beperkingen aan de richting van invloed van features, is denk ik onnodig ingewikkeld
+    
+
+    random_forest=sklearn.ensemble.RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, 
+                                                         min_samples_leaf=min_samples_leaf,min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features, 
+                                                         max_leaf_nodes=max_leaf_nodes, min_impurity_decrease=min_impurity_decrease, bootstrap=bootstrap, 
+                                                        oob_score=oob_score, n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start, 
+                                                        ccp_alpha=ccp_alpha, max_samples=max_samples, monotonic_cst=monotonic_cst)
+    random_forest.fit(X,y)
+    return random_forest 
+
+
+def combining_all_features(datafile):
+    """This functions makes an matrix with the descriptors from the ligands and proteins in the file
+    
+    Input: csv-file with a format of the trainingset (trainset: first colom:SMILES, second colom:UNIProt_ID, third colom: affinity) or testset(first colom:numbers, second colom:SMILES, third colom:UNIProt_ID)
+    
+    Output: matrix (n_samples*n_features) and affinity (np.array of length n_samples)
+    """
+    SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID(datafile)
+    uniprot_dict=extract_sequence("data/protein_info.csv")
+    for i in range(len(SMILES)):
+        ligand=small_molecule(SMILES[i])
+        ligand_features=ligand.rdkit_descriptor()
+
+        peptide=protein(UNIProt_ID[i], uniprot_dict)
+        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
+        peptide_features=np.array(peptide_features_list)
+        all_features=np.concatenate((ligand_features, peptide_features))
+        if i==0:
+            matrix=all_features
+        
+        else:
+            matrix=np.vstack((matrix,all_features))
+
+    return matrix,affinity
+
+
+def fit_PCA(X, n_components=None):
+    """performs a PCA on the data in X (np.array) and 
+    returns the features transformed onto the principal component feature space as X_scores (np.array of shape (n_samples, n_components))
+    Input parameter n_components has default value None, meaning it keeps all principal components by default"""
+    pca = sklearn.decomposition.PCA(n_components=n_components)
+    X_scores = pca.fit_transform(X)
+    variance_per_pc = pca.explained_variance_ratio_
+    return X_scores, variance_per_pc
+
+
+#Onderstaande 2 functies zijn voor ons eigen gebruik, voor als we gaan testen welke data source het beste is (Iris, vrijdagavond)
+def select_principal_components(X_pca_scores, variance_explained, goal_cumulative_variance):
+    """from the input array X_pca_scores, creates a new array relevant_principle_components, which is a subset
+    of the input array that includes only the relevant PCs to reach the goal_cumulative_variance. 
+    variance_explained is a np.array of shape (n_principal_components,) 
+    returned by the function fit_PCA that contains the portion of variance explained by each principal component."""
+    cumulative_variance = 0
+    pc = 0
+    while cumulative_variance < goal_cumulative_variance:
+        cumulative_variance += variance_explained[pc]
+        pc += 1
+    relevant_principal_components = X_pca_scores[:, :pc]
+    return relevant_principal_components
+
+
+#Code voor Iris om te testen welke data source het beste is
+def data_sources_training():
+    X,y = combining_all_features('data/train.csv')
+    train_set, validation_set = split_train_validation(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+    X_train_raw, y_train = train_set
+    data_sources_dict = make_data_sources_dict(X_train_raw)
+    best_data_source(data_sources_dict, y_train)
+    return
+
+
+def make_data_sources_dict(X_train_raw):
+    """applies cleaning, scaling, and pca where relevant.
+    returns the dictionary that can be used for the test_data_source function. 
+    This dictionary includes all data that will be tried for selecting the best input data:
+        - scaled
+        - cleaned (= outliers removed)
+        - cleaned + scaled
+        - scaled and transformed into pca feature space with enough features to explain 60% of variance
+        - scaled and transformed, 80%
+        - scaled and transformed, 95%
+        - the previous three but with the cleaning step"""
+    
+    scaler = set_scaling(X_train_raw)
+    X_train_scaled = data_scaling(scaler, X_train_raw)
+    X_train_pc_scores, variance_per_pc = fit_PCA(X_train_scaled)
+    X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
+    X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
+    X_train_pca95 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.95)
+    X_train_cleaned = data_cleaning(X_train_raw)
+    X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
+    X_train_cleaned_pc_scores, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
+    X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.66)
+    X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.80)
+    X_train_cleaned_pca95 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.95)
+
+    data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled, 
+                         'Scaled+pca66':X_train_pca66, 'Scaled+pca80':X_train_pca80, 'Scaled+pca95':X_train_pca95,
+                         'Cleaned+scaled+pca66':X_train_cleaned_pca66, 'Cleaned+scaled+pca80':X_train_cleaned_pca80, 'Cleaned+scaled+pca95':X_train_cleaned_pca95}
+    return data_sources_dict
+
+
+def best_data_source(data_sources_dict, y_train):
+    """tries multiple data sources specified in data_sources_dict to determine the best one using cross-validation"""
+    highest_cv_score = 0
+    for current_data_source, current_X_train in data_sources_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
+        clf = sklearn.ensemble.RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        mean_cv_score = sklearn.model_selection.cross_val_score(clf, current_X_train, y_train, cv=5).mean()
+        print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
+        if mean_cv_score > highest_cv_score:        
+            highest_cv_score = mean_cv_score
+            best_data_source = current_data_source          #keeps track of the best data source thus far
+    print(f'The best data source is {best_data_source}')
+
+
+def kaggle_submission(X_test,model,filename):
+    affinity_array=RF_predict(model, X_test)
+    f=open(filename,'w')
+    print(filename+" is made")
+    f.write("ID,affinity_score")
+    b=0
+    for a in affinity_array:
+        f.write("\n"+str(b)+","+ str(a))
+        b+=1
+    f.close()
+    return
+
+
+def make_pca_plots(pca_scores):
+    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
+    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space."""
+    fig, (ax1,ax2,ax3) = plt.subplots(3)
+    fig.suptitle('Principal component plots on cleaned and scaled training data')
+    ax1.scatter(pca_scores[:,0],pca_scores[:,1])
+    ax1.set(xlabel='First PC explained variance',ylabel='Second PC explained variance')
+    ax2.scatter(pca_scores[:,0],pca_scores[:,2])
+    ax2.set(xlabel='First PC explained variance',ylabel='Third PC explained variance')
+    ax3.scatter(pca_scores[:,1],pca_scores[:,2])
+    ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
+    plt.show()
+
+
+if run is True:                
+    starttime=time.time()
+    print("started")
+    X,y=combining_all_features("data/train.csv")
+    X_test,unknown_affinity=combining_all_features("data/test.csv")
+    print("data is prepared")
+    scaler=set_scaling(X)
+    X_scaled=data_scaling(scaler,X)
+    X_test_scaled=data_scaling(scaler,X_test)
+    print("data is scaled")
+    model=train_model(X_scaled,y)
+    print("model is trained")
+    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    print("file is made with predictions")
+    endtime=time.time()
+    print("the model is trained en data is predicted")
+    print("this took " + str(endtime-starttime) + "seconds")
 
