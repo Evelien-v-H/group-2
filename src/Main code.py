@@ -300,12 +300,15 @@ def make_data_sources_dict(X_train_raw):
     returns the dictionary that can be used for the test_data_source function. 
     This dictionary includes all data that will be tried for selecting the best input data:
         - scaled
-        - cleaned (= outliers removed)
+        - cleaned
         - cleaned + scaled
-        - scaled and transformed into pca feature space with enough features to explain 60% of variance
+        - scaled and transformed into pca feature space with enough features to explain 66% of variance
         - scaled and transformed, 80%
         - scaled and transformed, 95%
-        - the previous three but with the cleaning step"""
+        - cleaned, scaled and transformed, 66%
+        - cleaned, scaled and transformed, 80%
+        - cleaned, scaled and transformed, 95%
+        """
     
     scaler = set_scaling(X_train_raw)
     X_train_scaled = data_scaling(scaler, X_train_raw)
@@ -343,7 +346,7 @@ def best_data_source(data_sources_dict, y_train):
 #Code voor Iris om te testen welke data source het beste is
 def data_sources_training():
     X,y = combining_all_features_training('data/train.csv')
-    train_set, validation_set = splittingdata(X, y, 0.2)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+    train_set, validation_set = splittingdata(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
     X_train_raw, y_train = train_set
     data_sources_dict = make_data_sources_dict(X_train_raw)
     best_data_source(data_sources_dict, y_train)
@@ -388,24 +391,48 @@ def data_cleaning(data):
             else:
                 print(j,i)
                 print(data[j,i])
-                
+
+def make_pca_plots(pca_scores, y_train,cmap):
+    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
+    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space."""
+    fig, (ax1,ax2,ax3) = plt.subplots(3)
+    fig.tight_layout()
+    print(f'The shape of pca_scores[:,0] is {np.shape(pca_scores[:,0])}')
+    fig.suptitle('Principal component plots on cleaned and scaled training data')
+    vmin = np.percentile(y_train,1)
+    vmax = np.percentile(y_train,99)
+    ax1.scatter(pca_scores[:,0],pca_scores[:,1],s=0.5, c=y_train, cmap=cmap, vmin=vmin, vmax=vmax)
+    ax1.set(xlabel='PC1',ylabel='PC2')
+    ax2.scatter(pca_scores[:,0],pca_scores[:,2],s=0.5, c=y_train, cmap=cmap,vmin=vmin,vmax=vmax)
+    ax2.set(xlabel='PC1',ylabel='PC3')
+    ax3.scatter(x=pca_scores[:,1],y=pca_scores[:,2], s=0.5, c=y_train, cmap=cmap,vmin=vmin, vmax=vmax)
+    ax3.set(xlabel='PC2',ylabel='PC3')
+    plt.show()      
+
 if run is True:                
     starttime=time.time()
-    print("started")
+    print(f"started")
     X,y=combining_all_features_training("data/train.csv")
-    X_test=combining_all_features_test("data/test.csv")
-    print("data is prepared")
-    scaler=set_scaling(X)
-    X_scaled=data_scaling(scaler,X)
-    X_test_scaled=data_scaling(scaler,X)
-    print("data is scaled")
-    model=train_model(X_scaled,y)
-    print("model is trained")
-    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
-    print("file is made with predictions")
-    endtime=time.time()
-    print("the model is trained en data is predicted")
-    print("this took " + str(endtime-starttime) + "seconds")
+    print(f"time elapsed: {time.time()-starttime}, data is merged")
+    # X_test=combining_all_features_test("data/test.csv")
+    train_set, validation_set = splittingdata(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+    X_train_raw, y_train = train_set
+    print(f'The size of X_train_raw is {np.shape(X_train_raw)}, the size of y_train is {np.shape(y_train)}')
+    print(f"time elapsed: {time.time()-starttime}, X was splitted into X_train_raw")
+    scaler=set_scaling(X_train_raw)
+    X_train_scaled=data_scaling(scaler,X_train_raw)
+    print(f"time elapsed: {time.time()-starttime}, data is scaled")
+    print(f"The size of X_train_scaled is {np.shape(X_train_scaled)}")
+    X_train_pc_scores, variance_per_pc = fit_PCA(X_train_scaled)
+    print(f"pca is fitted")
+    print(f'The shape of X_train_pc_scores is {np.shape(X_train_pc_scores)}')
+    # model=train_model(X_scaled,y)
+    # print("model is trained")
+    # kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    # print("file is made with predictions")
+    # print("the model is trained en data is predicted")
+    print("this took " + str(time.time()-starttime) + " seconds in total")
+    make_pca_plots(X_train_pc_scores, y_train, 'gist_rainbow')
 
 def is_number(val):
     try:
@@ -467,15 +494,3 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-def make_pca_plots(pca_scores):
-    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
-    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space."""
-    fig, (ax1,ax2,ax3) = plt.subplots(3)
-    fig.suptitle('Principal component plots on cleaned and scaled training data')
-    ax1.scatter(pca_scores[:,0],pca_scores[:,1])
-    ax1.set(xlabel='First PC explained variance',ylabel='Second PC explained variance')
-    ax2.scatter(pca_scores[:,0],pca_scores[:,2])
-    ax2.set(xlabel='First PC explained variance',ylabel='Third PC explained variance')
-    ax3.scatter(pca_scores[:,1],pca_scores[:,2])
-    ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
-    plt.show()
