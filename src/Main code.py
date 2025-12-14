@@ -18,6 +18,7 @@ import peptidy as pep
 from peptidy import descriptors
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score, GridSearchCV
 
 import time
 
@@ -172,7 +173,7 @@ class protein:
         peptidy_features_list = list(peptidy_features_dict.values())
         return peptidy_features_list
 
-def splittingdata(X_train, y_train, percentage):
+def train_validation_split(X_train, y_train, percentage):
     """This function splits the data randomly into training data set and a validation
     data set. These training and validation set are returned as a tuple of 2 tuples
     as (X_training,y_training),(X_validation, y_validation). It splits the the data in
@@ -345,7 +346,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     #warm_start --> herbruikt dan de vorige call om beter te fitten, maar ik denk dat wij dit juist niet willen
     #ccp_alpha --> kan gebruikt worden voor overfitten maar is denk ik nu onnodig complex
     #monotonic_cst, je kan beperkingen aan de richting van invloed van features, is denk ik onnodig ingewikkeld
-    random_forest=sklearn.ensemble.RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, 
+    random_forest=RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, 
                                                          min_samples_leaf=min_samples_leaf,min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features, 
                                                          max_leaf_nodes=max_leaf_nodes, min_impurity_decrease=min_impurity_decrease, bootstrap=bootstrap, 
                                                         oob_score=oob_score, n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start, 
@@ -408,7 +409,7 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
 #Code voor Iris om te testen welke data source het beste is
 def data_sources_training():
     X,y = combining_all_features('data/train.csv')
-    train_set, validation_set = split_train_validation(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+    train_set, validation_set = train_validation_split(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
     X_train_raw, y_train = train_set
     data_sources_dict = make_data_sources_dict(X_train_raw)
     best_data_source(data_sources_dict, y_train)
@@ -450,10 +451,10 @@ def best_data_source(data_sources_dict, y_train):
     """tries multiple data sources specified in data_sources_dict to determine the best one using cross-validation"""
     highest_cv_score = 0
     for current_data_source, current_X_train in data_sources_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        clf = sklearn.ensemble.RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+        estimator = RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
-        mean_cv_score = sklearn.model_selection.cross_val_score(clf, current_X_train, y_train, cv=5).mean()
+        mean_cv_score = cross_val_score(estimator, current_X_train, y_train, cv=5).mean()
         print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
         if mean_cv_score > highest_cv_score:        
             highest_cv_score = mean_cv_score
@@ -476,7 +477,8 @@ def kaggle_submission(X_test,model,filename):
 
 def make_pca_plots(pca_scores):
     """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
-    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space."""
+    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space.
+    """
     fig, (ax1,ax2,ax3) = plt.subplots(3)
     fig.suptitle('Principal component plots on cleaned and scaled training data')
     ax1.scatter(pca_scores[:,0],pca_scores[:,1])
@@ -487,6 +489,18 @@ def make_pca_plots(pca_scores):
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
 
+def hyperparameter_tuning(X,y, n_estimators_grid, max_depth_grid, min_samples_split_grid, min_samples_leaf_grid, max_features_grid):
+    """Tunes the hyperparameters for the RF model using grid search
+    The following hyperparameters that will be tuned: 
+        n_estimators, max_depth, min_samples_split, min_samples_leaf, max_features
+    For each of these hyperparameters, the grid of values that will be tried can be specified as a list or arary.
+    """
+    params_to_try = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
+                     'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
+    model = RandomForestRegressor()
+    estimator = GridSearchCV(model, params_to_try, verbose=1.1)       #verbose controls how many intermediate messages are printed, does not impact outcome
+    estimator.fit(X,y)
+    return estimator
 
 #This if statement is really useful if you want to work on other parts of the code                
 if run is True:                
