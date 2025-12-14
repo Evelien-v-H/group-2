@@ -489,18 +489,31 @@ def make_pca_plots(pca_scores):
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
 
-def hyperparameter_tuning(X,y, n_estimators_grid, max_depth_grid, min_samples_split_grid, min_samples_leaf_grid, max_features_grid):
+def grid_search(X,y,param_grids):
     """Tunes the hyperparameters for the RF model using grid search
-    The following hyperparameters that will be tuned: 
-        n_estimators, max_depth, min_samples_split, min_samples_leaf, max_features
-    For each of these hyperparameters, the grid of values that will be tried can be specified as a list or arary.
+    Input: 
+    param_grids (dict): contains the parameters that will be tuned and their grid of values that will be tried
+    Returns the model fitted to the optimal combination of parameters
     """
-    params_to_try = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
-                     'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
     model = RandomForestRegressor()
-    estimator = GridSearchCV(model, params_to_try, verbose=1.1)       #verbose controls how many intermediate messages are printed, does not impact outcome
+    estimator = GridSearchCV(model, param_grids, verbose=1.1, n_jobs=-2, refit=True)       #verbose controls how many intermediate messages are printed, does not impact outcome
     estimator.fit(X,y)
-    return estimator
+    best_estimator = estimator.best_estimator_
+    return best_estimator.get_params
+
+def hyperparameter_tuning(X,y):
+    """function that can be used to tune the hyperparameters"""
+    n_estimators_grid = range(100,501,20)
+    max_depth_grid = range(3,16)
+    min_samples_split_grid = range(2,11)
+    min_samples_leaf_grid = range(1,6)
+    max_features_grid = ['sqrt','log2',None]
+    param_grids = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
+                     'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
+    print(grid_search(X,y,param_grids))           
+    #Nu print het nog iets, dat is handig voor als we hem gaan runnen maar dit moet straks natuurlijk netjes doorlopen naar de predict functie. 
+    #Misschien dat we deze en bovenstaande functie ook kunnen samenvoegen, moeten we even kijken. Het is nu los zodat we evt een andere techniek dan grid search kunnen doen
+
 
 #This if statement is really useful if you want to work on other parts of the code                
 if run is True:                
