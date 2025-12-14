@@ -312,6 +312,15 @@ def RF_error(model, X_test, y_test):
 def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
+    """Trains the model
+      
+    Input:X is the matrix with features and samples, y is the affinityscore in an array which is coupled with the sample
+    n_estimators is how many trees you want to use, this needs to be an integer, Max_depth is the maximum dept of the tree this is 
+    an integer or None, min_samples_split this is an integer or float with how many samples are needed per split. Min_samples_leaf are the samples you need
+    for a leaf node also an integer or fload, max_features how many features are used to make a tree integer or float, bootstrap is True or False, Random_state is integer or false,
+    Max_samples is an integer, float or None.
+    
+    Output: A random forest model  """
     #ja er komt een uitleg wat alles is en ik ga nog selecteren wat relevant is, dit zijn de standaard waarde van de makers van het model
     #Ik kan doordat ik dit tijdens de datacombinatie gaan doen omdat ik daar errors had nu niet de X,y die daaruit komt gebruiken dus die eventuele errors zal ik nog op moeten lossen
 
@@ -336,16 +345,6 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     #warm_start --> herbruikt dan de vorige call om beter te fitten, maar ik denk dat wij dit juist niet willen
     #ccp_alpha --> kan gebruikt worden voor overfitten maar is denk ik nu onnodig complex
     #monotonic_cst, je kan beperkingen aan de richting van invloed van features, is denk ik onnodig ingewikkeld
-     """Trains the model
-      
-    Input:X is the matrix with features and samples, y is the affinityscore in an array which is coupled with the sample
-    n_estimators is how many trees you want to use, this needs to be an integer, Max_depth is the maximum dept of the tree this is 
-    an integer or None, min_samples_split this is an integer or float with how many samples are needed per split. Min_samples_leaf are the samples you need
-    for a leaf node also an integer or fload, max_features how many features are used to make a tree integer or float, bootstrap is True or False, Random_state is integer or false,
-    Max_samples is an integer, float or None.
-    
-    Output: A random forest model  """
-
     random_forest=sklearn.ensemble.RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, 
                                                          min_samples_leaf=min_samples_leaf,min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features, 
                                                          max_leaf_nodes=max_leaf_nodes, min_impurity_decrease=min_impurity_decrease, bootstrap=bootstrap, 
