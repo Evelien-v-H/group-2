@@ -487,7 +487,23 @@ def make_pca_plots(pca_scores):
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
 
-SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID('data/train.csv')
-SMILE=SMILES[0]
-molecule=small_molecule(SMILE)
+def clipping_outliers(matrix,percentile_low=5,percentile_high=95):
+    """This function changes outliers to the highest possible not outlier value, percentile_low, the smallest percentile,percentile_high, highest percentile both must be integers
+    
+    input: matrix (a colom is a feature)
+    
+    output: matrix same format"""
+    new_array_list=[]
+    for i in range (matrix.shape[1]):
+        array=matrix[:,i]
+        lowest_percentile=np.percentile(array,percentile_low)
+        highest_percentile=np.percentile(array, percentile_high)
+        output_array=np.clip(array,a_min=lowest_percentile,a_max=highest_percentile)
+        new_array_list.append(output_array)
+    
+    matrix_output=np.column_stack(new_array_list)
+    return matrix_output
+
+
+
 
