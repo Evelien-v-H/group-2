@@ -52,8 +52,8 @@ def data_cleaning(data):
     return data
 
 array=[1,2,3]
-array1=[4,5,'string']
-array3=[7,8,None]
+array1=[4,5,6]
+array3=[7,8,9]
 matrix=np.vstack((array,array1))
 matrix=np.vstack((matrix,array3))
 
