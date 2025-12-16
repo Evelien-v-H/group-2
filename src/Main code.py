@@ -1,4 +1,5 @@
 run=True
+testing=False
 
 import pandas as pd
 import numpy as np
@@ -46,7 +47,7 @@ def data_to_SMILES_UNIProt_ID(datafile):
     colom_2=df.iloc[:,1].to_numpy()
     colom_3=df.iloc[:,2].to_numpy()
 
-    if colom_1[0]=="0":
+    if colom_1[0]==0:
         SMILES=colom_2
         UNIProt_ID=colom_3
         affinity='unknown affinity'
@@ -318,7 +319,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     Input:X is the matrix with features and samples, y is the affinityscore in an array which is coupled with the sample
     n_estimators is how many trees you want to use, this needs to be an integer, Max_depth is the maximum dept of the tree this is 
     an integer or None, min_samples_split this is an integer or float with how many samples are needed per split. Min_samples_leaf are the samples you need
-    for a leaf node also an integer or fload, max_features how many features are used to make a tree integer or float, bootstrap is True or False, Random_state is integer or false,
+    for a leaf node also an integer or fload, max_features how many features are used to make a tree can be sqrt, log2, none, bootstrap is True or False, Random_state is integer or false,
     Max_samples is an integer, float or None.
     
     Output: A random forest model  """
@@ -346,7 +347,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     #warm_start --> herbruikt dan de vorige call om beter te fitten, maar ik denk dat wij dit juist niet willen
     #ccp_alpha --> kan gebruikt worden voor overfitten maar is denk ik nu onnodig complex
     #monotonic_cst, je kan beperkingen aan de richting van invloed van features, is denk ik onnodig ingewikkeld
-    random_forest=RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, 
+    random_forest=RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split,
                                                          min_samples_leaf=min_samples_leaf,min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features, 
                                                          max_leaf_nodes=max_leaf_nodes, min_impurity_decrease=min_impurity_decrease, bootstrap=bootstrap, 
                                                         oob_score=oob_score, n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start, 
@@ -355,7 +356,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     return random_forest 
 
 
-def combining_all_features(datafile):
+def combining_all_features(datafile, features=True, topological=True, morgan=True, macckeys=True):
     """This functions makes an matrix with the descriptors from the ligands and proteins in the file
     
     Input: csv-file with a format of the trainingset (trainset: first colom:SMILES, second colom:UNIProt_ID, third colom: affinity) or testset(first colom:numbers, second colom:SMILES, third colom:UNIProt_ID)
@@ -366,12 +367,65 @@ def combining_all_features(datafile):
     uniprot_dict=extract_sequence("data/protein_info.csv")
     for i in range(len(SMILES)):
         ligand=small_molecule(SMILES[i])
-        ligand_features=ligand.rdkit_descriptor()
+        if features==True:
+            ligand_features=ligand.rdkit_descriptor()
+        if topological==True:
+            ligand_topological=ligand.topological_fingerprints()
+        if morgan==True:
+            ligand_morgan=ligand.morgan_fingerprint()
+        if macckeys==True:
+            ligand_macckeys=ligand.macckeys()
 
         peptide=protein(UNIProt_ID[i], uniprot_dict)
         peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
         peptide_features=np.array(peptide_features_list)
-        all_features=np.concatenate((ligand_features, peptide_features))
+        if features==True:
+            if topological==True:
+                if morgan==True:
+                    if macckeys==True:
+                        all_features=np.concatenate((ligand_features,ligand_topological,ligand_morgan,ligand_macckeys,peptide_features))
+                    else:
+                        all_features=np.concatenate((ligand_features,ligand_topological,ligand_morgan,peptide_features))
+                else:
+                    if macckeys==True:
+                        all_features=np.concatenate((ligand_features,ligand_topological,ligand_macckeys,peptide_features))
+                    else:
+                        all_features=np.concatenate((ligand_features,ligand_topological,peptide_features))
+            else:
+                if morgan==True:
+                    if macckeys==True:
+                        all_features=np.concatenate((ligand_features,ligand_morgan,ligand_macckeys,peptide_features))
+                    else:
+                        all_features=np.concatenate((ligand_features,ligand_morgan,peptide_features))
+                else:
+                    if macckeys==True:
+                        all_features=np.concatenate((ligand_features,ligand_macckeys,peptide_features))
+                    else:
+                        all_features=np.concatenate((ligand_features, peptide_features))
+        else:
+            if topological==True:
+                if morgan==True:
+                    if macckeys==True:
+                        all_features=np.concatenate((ligand_topological,ligand_morgan,ligand_macckeys,peptide_features))
+                    else:
+                        all_features=np.concatenate((ligand_topological,ligand_morgan,peptide_features))
+                else:
+                    if macckeys==True:
+                        all_features=np.concatenate((ligand_topological,ligand_macckeys,peptide_features))
+                    else:
+                        all_features=np.concatenate((ligand_topological,peptide_features))
+            else:
+                if morgan==True:
+                    if macckeys==True:
+                        all_features=np.concatenate((ligand_morgan,ligand_macckeys,peptide_features))
+                    else:
+                        all_features=np.concatenate((ligand_morgan,peptide_features))
+                else:
+                    if macckeys==True:
+                        all_features=np.concatenate((ligand_macckeys,peptide_features))
+                    else:
+                        raise RuntimeError("at least one must be true")
+                        
         if i==0:
             matrix=all_features
         
@@ -543,19 +597,69 @@ def hyperparameter_tuning(X,y):
 if run is True:                
     starttime=time.time()
     print("started")
-    X,y=combining_all_features("data/train.csv")
-    # X_test,unknown_affinity=combining_all_features("data/test.csv")
-    print("data is prepared")
+    bestscore=0
+    bestfeatures=False
+    besttopological=True
+    bestmorgan=True
+    bestmacckeys=True
+    if testing==True:
+        for f in range(0,2):
+            for t in range(0,2):
+                for mo in range(0,2):
+                    for ma in range(0,2):
+                        if f==1 and t==1 and mo==1 and ma==1:
+                            pass
+                        else:
+                            if f==0:
+                                features=True
+                            else:
+                                features=False
+                            if t==0:
+                                topological=True
+                            else:
+                                topological=False
+                            if mo==0:
+                                morgan=True
+                            else:
+                                morgan=False
+                            if ma==0:
+                                macckeys=True
+                            else:
+                                macckeys=False
+                            X,y=combining_all_features("data/train.csv",features=features,topological=topological,morgan=morgan,macckeys=macckeys)
+                            training,validation=splittingdata(X,y,0.8)
+                            X_training,y_training=training
+                            X_validation,y_validation=validation
+                            print("data is prepared")
+                            scaler=set_scaling(X_training)
+                            X_training_scaled=data_scaling(scaler,X_training)
+                            X_validation_scaled=data_scaling(scaler,X_validation)
+                            print("data is scaled")
+                            model=train_model(X_training_scaled,y_training)
+                            print("model is trained")
+                            score=RF_error(model,X_validation_scaled,y_validation)
+                            print("features="+str(features)+" and topological="+str(topological)+" and morgan="+str(morgan)+" and macckeys="+str(macckeys)+" -> score="+str(score))
+                            if score>bestscore:
+                                bestscore=score
+                                bestfeatures=features
+                                besttopological=topological
+                                bestmorgan=morgan
+                                bestmacckeys=macckeys
+                            print("score is calculated for features="+str(features)+" and topological="+str(topological)+" and morgan="+str(morgan)+" and macckeys="+str(macckeys))
+    X,y=combining_all_features("data/train.csv",features=bestfeatures,topological=besttopological,morgan=bestmorgan,macckeys=bestmacckeys)
+    print("trainingset is prepared")
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
-    # X_test_scaled=data_scaling(scaler,X_test)
-    print("data is scaled")
-    hyperparameter_tuning(X_scaled,y)
-    # # model=train_model(X_scaled,y)
-    # print("model is trained")
-    # kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
-    # print("file is made with predictions")
-    # endtime=time.time()
-    # print("the model is trained en data is predicted")
-    total_time = time.time()-starttime
-    print(f"this took {total_time} seconds, which is {total_time/60} minutes")
+    print("trainingset is scaled")
+    X_test,unknown_affinity=combining_all_features("data/test.csv",features=bestfeatures,topological=besttopological,morgan=bestmorgan,macckeys=bestmacckeys)
+    print("testset is prepared")
+    X_test_scaled=data_scaling(scaler,X_test)
+    print("testset is scaled")
+    model=train_model(X_scaled,y)
+    print("model is trained")
+    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    print("file is made with predictions")
+    endtime=time.time()
+    print("the model is trained en data is predicted")
+    print("this took " + str(endtime-starttime) + "seconds")
+
