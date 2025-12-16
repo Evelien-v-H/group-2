@@ -46,7 +46,7 @@ def data_to_SMILES_UNIProt_ID(datafile):
     colom_2=df.iloc[:,1].to_numpy()
     colom_3=df.iloc[:,2].to_numpy()
 
-    if colom_1[0]=="0":
+    if colom_1[0]==0:
         SMILES=colom_2
         UNIProt_ID=colom_3
         affinity='unknown affinity'
