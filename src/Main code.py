@@ -488,7 +488,7 @@ def make_pca_plots(pca_scores):
     ax3.scatter(pca_scores[:,1],pca_scores[:,2])
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
-
+ 
 def grid_search(X,y,param_grids):
     """Tunes the hyperparameters for the RF model using grid search
     Input: 
@@ -496,7 +496,7 @@ def grid_search(X,y,param_grids):
     Returns the model fitted to the optimal combination of parameters
     """
     model = RandomForestRegressor()
-    estimator = GridSearchCV(model, param_grids, verbose=1.1, n_jobs=-2, refit=True, cv=5)       #verbose controls how many intermediate messages are printed, does not impact outcome
+    estimator = GridSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=5)
     estimator.fit(X,y)
     best_estimator = estimator.best_estimator_
     return best_estimator.get_params()
@@ -535,4 +535,3 @@ if run is True:
     # print("the model is trained en data is predicted")
     total_time = time.time()-starttime
     print(f"this took {total_time} seconds, which is {total_time/60} minutes")
-
