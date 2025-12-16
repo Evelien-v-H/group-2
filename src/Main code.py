@@ -627,7 +627,7 @@ if run is True:
                             else:
                                 macckeys=False
                             X,y=combining_all_features("data/train.csv",features=features,topological=topological,morgan=morgan,macckeys=macckeys)
-                            training,validation=splittingdata(X,y,0.8)
+                            training,validation=train_validation_split(X,y,0.8)
                             X_training,y_training=training
                             X_validation,y_validation=validation
                             print("data is prepared")
