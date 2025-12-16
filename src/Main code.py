@@ -1,4 +1,4 @@
-run=True
+run=False
 
 import pandas as pd
 import numpy as np
@@ -45,7 +45,7 @@ def data_to_SMILES_UNIProt_ID(datafile):
     colom_2=df.iloc[:,1].to_numpy()
     colom_3=df.iloc[:,2].to_numpy()
 
-    if colom_1[0]=="0":
+    if colom_1[0]==0:
         SMILES=colom_2
         UNIProt_ID=colom_3
         affinity='unknown affinity'
@@ -385,7 +385,7 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
 #Code voor Iris om te testen welke data source het beste is
 def data_sources_training():
     X,y = combining_all_features('data/train.csv')
-    train_set, validation_set = split_train_validation(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+    train_set, validation_set = splittingdata(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
     X_train_raw, y_train = train_set
     data_sources_dict = make_data_sources_dict(X_train_raw)
     best_data_source(data_sources_dict, y_train)
