@@ -1,5 +1,6 @@
-run=True
+run=False
 testing=False
+tuning=True
 
 import pandas as pd
 import numpy as np
@@ -577,7 +578,7 @@ def randomised_search(X,y,param_grids, n_iter, cv_fold=5):
     return best_params
 
 
-def hyperparameter_tuning(X,y):
+def hyperparameter_tuning(X, y, cv_fold):
     """function that can be used to tune the hyperparameters"""
     n_estimators_grid = range(100,501,20)
     max_depth_grid = range(3,16)
@@ -587,11 +588,22 @@ def hyperparameter_tuning(X,y):
     param_grids = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
                      'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
     # print(grid_search(X,y,param_grids))
-    print(randomised_search(X,y,param_grids,n_iter=120,cv_fold=3))
+    print(randomised_search(X,y,param_grids,n_iter=120,cv_fold=cv_fold))
               
     #Nu print het nog iets, dat is handig voor als we hem gaan runnen maar dit moet straks natuurlijk netjes doorlopen naar de predict functie. 
     #Misschien dat we deze en bovenstaande functie ook kunnen samenvoegen, moeten we even kijken. Het is nu los zodat we evt een andere techniek dan grid search kunnen doen
 
+if tuning is True:
+    starttime=time.time()
+    print("started")
+    X,y=combining_all_features("data/train.csv")
+    print("data is prepared")
+    scaler=set_scaling(X)
+    X_scaled=data_scaling(scaler,X)
+    print("data is scaled")
+    hyperparameter_tuning(X_scaled,y,cv_fold=3)
+    total_time = time.time()-starttime
+    print(f"this took {total_time} seconds, which is {total_time/60} minutes")
 
 #This if statement is really useful if you want to work on other parts of the code                
 if run is True:                
