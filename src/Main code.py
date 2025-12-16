@@ -543,65 +543,45 @@ def make_pca_plots(pca_scores):
     ax3.scatter(pca_scores[:,1],pca_scores[:,2])
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
- 
-def grid_search(X,y,param_grids, cv_fold=5):
-    """Tunes the hyperparameters for the RF model using grid search
-    Input: 
-    X (np.array): array of size (n_samples * n_features)
-    y (np.array): array of size (n_samples,)
-    param_grids (dict): contains the parameters that will be tuned and their grid of values that will be tried
-    cv_fold (int): determines the fold of the cross validation, i.e. how many different predictions will be made per parameter combination
-    Returns a dictionary of the most optimal parameters
-    """
-    model = RandomForestRegressor()
-    estimator = GridSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold)
-    estimator.fit(X,y)
-    best_estimator = estimator.best_estimator_
-    best_params = estimator.best_params_
-    return best_params
 
-def randomised_search(X,y,param_grids, n_iter, cv_fold=5):
+def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomized'):
     """Tunes the hyperparameters for the RF model using randomised search.
     Input:  
     X (np.array): array of size (n_samples * n_features)
     y (np.array): array of size (n_samples,)
     param_grids (dict): contains the parameters that will be tuned and their grid of values that will be tried
-    n_iter (int): number of iterations the model will take
+    n_iter (int): number of iterations the model will take, only relevant if search_type='randomized'
     cv_fold (int): determines the fold of the cross validation, i.e. how many different predictions will be made per parameter combination
+    search_type ('randomized' or 'grid'): determines whether randomized or grid search will be performed.
     Returns a dictionary of the most optimal parameters found
     """
     model = RandomForestRegressor()
-    estimator = RandomizedSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, n_iter=n_iter)
+    if search_type=='grid':
+        estimator = GridSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold)
+    elif search_type=='randomized':
+        estimator = RandomizedSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, n_iter=n_iter, verbose=2)
     estimator.fit(X,y)
     best_estimator = estimator.best_estimator_
     best_params = estimator.best_params_
     return best_params
 
 
-def hyperparameter_tuning(X, y, cv_fold):
-    """function that can be used to tune the hyperparameters"""
-    n_estimators_grid = range(100,501,20)
-    max_depth_grid = range(3,16)
-    min_samples_split_grid = range(2,11)
-    min_samples_leaf_grid = range(1,6)
-    max_features_grid = ['sqrt','log2',None]
-    param_grids = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
-                     'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
-    # print(grid_search(X,y,param_grids))
-    print(randomised_search(X,y,param_grids,n_iter=120,cv_fold=cv_fold))
-              
-    #Nu print het nog iets, dat is handig voor als we hem gaan runnen maar dit moet straks natuurlijk netjes doorlopen naar de predict functie. 
-    #Misschien dat we deze en bovenstaande functie ook kunnen samenvoegen, moeten we even kijken. Het is nu los zodat we evt een andere techniek dan grid search kunnen doen
-
 if tuning is True:
     starttime=time.time()
-    print("started")
-    X,y=combining_all_features("data/train.csv")
+    print("started tuning")
+    X,y=combining_all_features("data/train.csv",features=False,topological=True,morgan=True,macckeys=True)
     print("data is prepared")
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
     print("data is scaled")
-    hyperparameter_tuning(X_scaled,y,cv_fold=3)
+    n_estimators_grid = range(100,301,20)
+    max_depth_grid = range(3,16)
+    min_samples_split_grid = range(2,11)
+    min_samples_leaf_grid = range(1,6)
+    max_features_grid = ['sqrt','log2',None]
+    param_options = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
+                     'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
+    print(hyperparams_cv(X,y,param_options,n_iter=200,cv_fold=3))
     total_time = time.time()-starttime
     print(f"this took {total_time} seconds, which is {total_time/60} minutes")
 
