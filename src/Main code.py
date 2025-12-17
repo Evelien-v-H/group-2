@@ -1,5 +1,6 @@
 run=False
 testing=False
+kaggle=True
 tuning=False
 
 import pandas as pd
@@ -165,7 +166,7 @@ class protein:
         """input is the sequence of a protein in one letter code. Returns a 
         list with the encoded peptide sequence represented as one-hot encoded
         vector."""
-        onehot=pep.one_hot_encoding(sequence,822)
+        onehot=pep.one_hot_encoding(sequence,822) #longest protein is 822 amino acids
         return onehot
     
     def extract_features(self, sequence):
@@ -667,4 +668,23 @@ if run is True:
     endtime=time.time()
     print("the model is trained en data is predicted")
     print("this took " + str(endtime-starttime) + "seconds")
+
+
+if kaggle==True:
+    starttime=time.time()
+    X,y=combining_all_features("data/train.csv",features=False,topological=True,morgan=True,macckeys=True)
+    scaler=set_scaling(X)
+    X_scaled=data_scaling(scaler,X)
+    print("trainingset is scaled")
+    X_test,unknown_affinity=combining_all_features("data/test.csv",features=False,topological=True,morgan=True,macckeys=True)
+    print("testset is prepared")
+    X_test_scaled=data_scaling(scaler,X_test)
+    print("testset is scaled")
+    model=train_model(X_scaled,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
+    print("model is trained")
+    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    print("file is made with predictions")
+    endtime=time.time()
+    print("the model is trained en data is predicted")
+    print("this took " + str(endtime-starttime) + " seconds")
 
