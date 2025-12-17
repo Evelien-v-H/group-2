@@ -1,6 +1,7 @@
 run=False
 testing=False
 kaggle=True
+tuning=False
 
 import pandas as pd
 import numpy as np
@@ -20,6 +21,7 @@ import peptidy as pep
 from peptidy import descriptors
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score, GridSearchCV, RandomizedSearchCV
 
 import time
 
@@ -174,7 +176,7 @@ class protein:
         peptidy_features_list = list(peptidy_features_dict.values())
         return peptidy_features_list
 
-def splittingdata(X_train, y_train, percentage):
+def train_validation_split(X_train, y_train, percentage):
     """This function splits the data randomly into training data set and a validation
     data set. These training and validation set are returned as a tuple of 2 tuples
     as (X_training,y_training),(X_validation, y_validation). It splits the the data in
@@ -211,42 +213,39 @@ def is_number(val):
     except (ValueError, TypeError):
         return False
 
-def data_cleaning(data):
+def data_cleaning_train(data):
     """Cleans the data, removes coloms without floats or strings and replaces empty values or strings in features and gives an error 
-    if een float or int is to big for np.float32
+    if een float or int is to big for np.float32 and it returns information about this proces
     
     Input data matrix (n*m)
     
-    Output an matrix, size is (n*unknown) unknown is dependend on the useless features because string or none information """
+    Output an matrix, size is (n*unknown) unknown is dependend on the useless features because string or none information, an list with information about the mean value of coloms
+    and an list with irrelevant features, this information is needed for the test set """
     irrelevant_colums=[]
+    mean_value_coloms=[]
     for i in range(data.shape[1]):
-        already_errorvalue=False
+        values_colom=[]
         for j in range(data.shape[0]):
             if is_number(data[j,i]) is True:
-                if float(data[j,i])>=np.finfo(np.float32).max:
-                    raise ValueError("You're value is to big for the float32 of the random forest. Solve this manual")
-                else:
-                    data[j,i]=float(data[j,i])
-            
-            else:
-                if already_errorvalue is False:
-                    values_colom=[]
-                    for k in range(data.shape[0]):
-                        if is_number(data[k,i]) is True:
-                            values_colom.append(float(data[k,i]))
+                values_colom.append(float(data[j,i]))
+
+        if len(values_colom)!=0:
+            mean_value=np.mean(values_colom)
+            mean_value_coloms.append(mean_value)
                     
-                    if len(values_colom)!=0:
-                        mean_value_colom=np.mean(values_colom)
-                        data[j,i]=float(mean_value_colom)
-                    
+        else:
+            irrelevant_colums.append(i)
+
+        for k in range(data.shape[0]):
+            if i not in irrelevant_colums:
+                if is_number(data[k,i]) is True:
+                    if float(data[k,i])>=np.finfo(np.float32).max:
+                        raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manual")
                     else:
-                        irrelevant_colums.append(i)
-                    already_errorvalue=True
-                    
+                        data[k,i]=float(data[k,i])
             
                 else:
-                    if i not in irrelevant_colums:
-                        data[j,i]=float(mean_value_colom)
+                    data[k,i]=mean_value
 
     if len(irrelevant_colums)>0:
         irrelevant_colums.reverse()
@@ -254,7 +253,29 @@ def data_cleaning(data):
             print('a feature is deleted colom:',n)
             data = np.delete(data, n, axis=1)
 
+    return data, mean_value_coloms, irrelevant_colums
+
+def data_cleaning_test(data,mean_value_coloms, irrelevant_colums):
+    """This code cleans the test data with information from the cleaning of the trainingset
+    
+    input: data in matrix, mean_value_coloms in a list and irrelevant_colomus in an list. This list needs to be high values to lower values
+    
+    output: data in a matrix"""
+    if len(irrelevant_colums)>0:
+         for n in irrelevant_colums:
+            print('a feature is deleted colom:',n)
+            data = np.delete(data, n, axis=1)
+    for i in range(data.shape[1]):
+        for j in range(data.shape[0]):
+            if is_number(data[j,i]) is True:
+                if float(data[j,i])>=np.finfo(np.float32).max:
+                    raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manual")
+                else:
+                    data[j,i]=float(data[j,i])
+            else:
+                data[j,i]=mean_value_coloms[i]
     return data
+
 
 def check_matrix(X):
     """CHecks if there are values in a matrix an random forest can crash on. This is an function for ourselves to control this if we get an error
@@ -270,23 +291,40 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-def clipping_outliers(matrix,percentile_low=5,percentile_high=95):
+def clipping_outliers_train(matrix,percentile_low=5,percentile_high=95):
     """This function changes outliers to the highest possible not outlier value, percentile_low, the smallest percentile,percentile_high, highest percentile both must be integers
     
     input: matrix (a colom is a feature)
     
-    output: matrix same format"""
+    output: matrix same format, list with lowest and highest percentile in an tuple for every colom, this is needed for the test clipping outlier"""
     new_array_list=[]
+    percentile_list=[]
     for i in range (matrix.shape[1]):
         array=matrix[:,i]
         lowest_percentile=np.percentile(array,percentile_low)
         highest_percentile=np.percentile(array, percentile_high)
         output_array=np.clip(array,a_min=lowest_percentile,a_max=highest_percentile)
         new_array_list.append(output_array)
+        percentile_list.append((lowest_percentile,highest_percentile))
+    
+    matrix_output=np.column_stack(new_array_list)
+    return matrix_output,percentile_list
+
+def clipping_outliers_test(matrix, percentile_list):
+    """"This function changes outliers to the highest possible not outlier value, percentile_list contains the info which the function uses for that purpose
+    
+    input: matrix, percentile_list (first lowest value, than highest value)
+    
+    output matrix"""
+    new_array_list=[]
+    for i in range (matrix.shape[1]):
+        array=matrix[:,i]
+        lowest_percentile,highest_percentile=percentile_list[i]
+        output_array=np.clip(array,a_min=lowest_percentile,a_max=highest_percentile)
+        new_array_list.append(output_array)
     
     matrix_output=np.column_stack(new_array_list)
     return matrix_output
-
 
 def set_scaling(X):
     """makes the scaler, from given data set X. the scaler used
@@ -324,7 +362,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     
     Output: A random forest model  """
     
-    random_forest=sklearn.ensemble.RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, 
+    random_forest=RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split,
                                                          min_samples_leaf=min_samples_leaf,min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features, 
                                                          max_leaf_nodes=max_leaf_nodes, min_impurity_decrease=min_impurity_decrease, bootstrap=bootstrap, 
                                                         oob_score=oob_score, n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start, 
@@ -440,7 +478,7 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
 #Code voor Iris om te testen welke data source het beste is
 def data_sources_training():
     X,y = combining_all_features('data/train.csv')
-    train_set, validation_set = splittingdata(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
+    train_set, validation_set = train_validation_split(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
     X_train_raw, y_train = train_set
     data_sources_dict = make_data_sources_dict(X_train_raw)
     best_data_source(data_sources_dict, y_train)
@@ -465,7 +503,7 @@ def make_data_sources_dict(X_train_raw):
     X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
     X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
     X_train_pca95 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.95)
-    X_train_cleaned = data_cleaning(X_train_raw)
+    X_train_cleaned, mean_value_list_train, irrelevant_features_train = data_cleaning_train(X_train_raw)
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
     X_train_cleaned_pc_scores, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
     X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.66)
@@ -482,10 +520,10 @@ def best_data_source(data_sources_dict, y_train):
     """tries multiple data sources specified in data_sources_dict to determine the best one using cross-validation"""
     highest_cv_score = 0
     for current_data_source, current_X_train in data_sources_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        clf = sklearn.ensemble.RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+        estimator = RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
-        mean_cv_score = sklearn.model_selection.cross_val_score(clf, current_X_train, y_train, cv=5).mean()
+        mean_cv_score = cross_val_score(estimator, current_X_train, y_train, cv=5).mean()
         print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
         if mean_cv_score > highest_cv_score:        
             highest_cv_score = mean_cv_score
@@ -508,7 +546,8 @@ def kaggle_submission(X_test,model,filename):
 
 def make_pca_plots(pca_scores):
     """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
-    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space."""
+    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space.
+    """
     fig, (ax1,ax2,ax3) = plt.subplots(3)
     fig.suptitle('Principal component plots on cleaned and scaled training data')
     ax1.scatter(pca_scores[:,0],pca_scores[:,1])
@@ -519,6 +558,46 @@ def make_pca_plots(pca_scores):
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
 
+def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomized'):
+    """Tunes the hyperparameters for the RF model using randomised search.
+    Input:  
+    X (np.array): array of size (n_samples * n_features)
+    y (np.array): array of size (n_samples,)
+    param_grids (dict): contains the parameters that will be tuned and their grid of values that will be tried
+    n_iter (int): number of iterations the model will take, only relevant if search_type='randomized'
+    cv_fold (int): determines the fold of the cross validation, i.e. how many different predictions will be made per parameter combination
+    search_type ('randomized' or 'grid'): determines whether randomized or grid search will be performed.
+    Returns a dictionary of the most optimal parameters found
+    """
+    model = RandomForestRegressor()
+    if search_type=='grid':
+        estimator = GridSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold)
+    elif search_type=='randomized':
+        estimator = RandomizedSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, n_iter=n_iter, verbose=2)
+    estimator.fit(X,y)
+    best_estimator = estimator.best_estimator_
+    best_params = estimator.best_params_
+    return best_params
+
+
+if tuning is True:
+    starttime=time.time()
+    print("started tuning")
+    X,y=combining_all_features("data/train.csv",features=False,topological=True,morgan=True,macckeys=True)
+    print("data is prepared")
+    scaler=set_scaling(X)
+    X_scaled=data_scaling(scaler,X)
+    print("data is scaled")
+    n_estimators_grid = range(100,301,20)
+    max_depth_grid = range(3,16)
+    min_samples_split_grid = range(2,11)
+    min_samples_leaf_grid = range(1,6)
+    max_features_grid = ['sqrt','log2',None]
+    param_options = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
+                     'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
+    print(hyperparams_cv(X,y,param_options,n_iter=200,cv_fold=3))
+    total_time = time.time()-starttime
+    print(f"this took {total_time} seconds, which is {total_time/60} minutes")
 
 #This if statement is really useful if you want to work on other parts of the code                
 if run is True:                
@@ -554,7 +633,7 @@ if run is True:
                             else:
                                 macckeys=False
                             X,y=combining_all_features("data/train.csv",features=features,topological=topological,morgan=morgan,macckeys=macckeys)
-                            training,validation=splittingdata(X,y,0.8)
+                            training,validation=train_validation_split(X,y,0.8)
                             X_training,y_training=training
                             X_validation,y_validation=validation
                             print("data is prepared")
