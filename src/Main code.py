@@ -290,23 +290,40 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-def clipping_outliers(matrix,percentile_low=5,percentile_high=95):
+def clipping_outliers_train(matrix,percentile_low=5,percentile_high=95):
     """This function changes outliers to the highest possible not outlier value, percentile_low, the smallest percentile,percentile_high, highest percentile both must be integers
     
     input: matrix (a colom is a feature)
     
-    output: matrix same format"""
+    output: matrix same format, list with lowest and highest percentile in an tuple for every colom, this is needed for the test clipping outlier"""
     new_array_list=[]
+    percentile_list=[]
     for i in range (matrix.shape[1]):
         array=matrix[:,i]
         lowest_percentile=np.percentile(array,percentile_low)
         highest_percentile=np.percentile(array, percentile_high)
         output_array=np.clip(array,a_min=lowest_percentile,a_max=highest_percentile)
         new_array_list.append(output_array)
+        percentile_list.append((lowest_percentile,highest_percentile))
+    
+    matrix_output=np.column_stack(new_array_list)
+    return matrix_output,percentile_list
+
+def clipping_outliers_test(matrix, percentile_list):
+    """"This function changes outliers to the highest possible not outlier value, percentile_list contains the info which the function uses for that purpose
+    
+    input: matrix, percentile_list (first lowest value, than highest value)
+    
+    output matrix"""
+    new_array_list=[]
+    for i in range (matrix.shape[1]):
+        array=matrix[:,i]
+        lowest_percentile,highest_percentile=percentile_list[i]
+        output_array=np.clip(array,a_min=lowest_percentile,a_max=highest_percentile)
+        new_array_list.append(output_array)
     
     matrix_output=np.column_stack(new_array_list)
     return matrix_output
-
 
 def set_scaling(X):
     """makes the scaler, from given data set X. the scaler used
