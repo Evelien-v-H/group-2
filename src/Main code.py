@@ -1,6 +1,6 @@
 run=False
 testing=False
-tuning=True
+tuning=False
 
 import pandas as pd
 import numpy as np
@@ -212,42 +212,39 @@ def is_number(val):
     except (ValueError, TypeError):
         return False
 
-def data_cleaning(data):
+def data_cleaning_train(data):
     """Cleans the data, removes coloms without floats or strings and replaces empty values or strings in features and gives an error 
-    if een float or int is to big for np.float32
+    if een float or int is to big for np.float32 and it returns information about this proces
     
     Input data matrix (n*m)
     
-    Output an matrix, size is (n*unknown) unknown is dependend on the useless features because string or none information """
+    Output an matrix, size is (n*unknown) unknown is dependend on the useless features because string or none information, an list with information about the mean value of coloms
+    and an list with irrelevant features, this information is needed for the test set """
     irrelevant_colums=[]
+    mean_value_coloms=[]
     for i in range(data.shape[1]):
-        already_errorvalue=False
+        values_colom=[]
         for j in range(data.shape[0]):
             if is_number(data[j,i]) is True:
-                if float(data[j,i])>=np.finfo(np.float32).max:
-                    raise ValueError("You're value is to big for the float32 of the random forest. Solve this manual")
-                else:
-                    data[j,i]=float(data[j,i])
-            
-            else:
-                if already_errorvalue is False:
-                    values_colom=[]
-                    for k in range(data.shape[0]):
-                        if is_number(data[k,i]) is True:
-                            values_colom.append(float(data[k,i]))
+                values_colom.append(float(data[j,i]))
+
+        if len(values_colom)!=0:
+            mean_value=np.mean(values_colom)
+            mean_value_coloms.append(mean_value)
                     
-                    if len(values_colom)!=0:
-                        mean_value_colom=np.mean(values_colom)
-                        data[j,i]=float(mean_value_colom)
-                    
+        else:
+            irrelevant_colums.append(i)
+
+        for k in range(data.shape[0]):
+            if i not in irrelevant_colums:
+                if is_number(data[k,i]) is True:
+                    if float(data[k,i])>=np.finfo(np.float32).max:
+                        raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manual")
                     else:
-                        irrelevant_colums.append(i)
-                    already_errorvalue=True
-                    
+                        data[k,i]=float(data[k,i])
             
                 else:
-                    if i not in irrelevant_colums:
-                        data[j,i]=float(mean_value_colom)
+                    data[k,i]=mean_value
 
     if len(irrelevant_colums)>0:
         irrelevant_colums.reverse()
@@ -255,7 +252,29 @@ def data_cleaning(data):
             print('a feature is deleted colom:',n)
             data = np.delete(data, n, axis=1)
 
+    return data, mean_value_coloms, irrelevant_colums
+
+def data_cleaning_test(data,mean_value_coloms, irrelevant_colums):
+    """This code cleans the test data with information from the cleaning of the trainingset
+    
+    input: data in matrix, mean_value_coloms in a list and irrelevant_colomus in an list. This list needs to be high values to lower values
+    
+    output: data in a matrix"""
+    if len(irrelevant_colums)>0:
+         for n in irrelevant_colums:
+            print('a feature is deleted colom:',n)
+            data = np.delete(data, n, axis=1)
+    for i in range(data.shape[1]):
+        for j in range(data.shape[0]):
+            if is_number(data[j,i]) is True:
+                if float(data[j,i])>=np.finfo(np.float32).max:
+                    raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manual")
+                else:
+                    data[j,i]=float(data[j,i])
+            else:
+                data[j,i]=mean_value_coloms[i]
     return data
+
 
 def check_matrix(X):
     """CHecks if there are values in a matrix an random forest can crash on. This is an function for ourselves to control this if we get an error
@@ -324,30 +343,7 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     Max_samples is an integer, float or None.
     
     Output: A random forest model  """
-    #ja er komt een uitleg wat alles is en ik ga nog selecteren wat relevant is, dit zijn de standaard waarde van de makers van het model
-    #Ik kan doordat ik dit tijdens de datacombinatie gaan doen omdat ik daar errors had nu niet de X,y die daaruit komt gebruiken dus die eventuele errors zal ik nog op moeten lossen
-
-    #n_estimators is het aantal bomen dat je wilt gaan gebruiken, dit lijkt mij relevant
-    #criterion, dit is de Loss functie die je gebruikt om op zoek te gaan naar de beste boom,
-    #Max_depth De maximum depth van de boom, je kan dus ook het maximum qua aantal takken voorstellen. Dit is iets anders dan de minimum aantal samples per afsplitsing. Dit is een hyperparameter die we uit zullen moeten gaan testen
-    #min_samples_split minimaal aantal samples per split, dit is een hyperparameter die we sws moeten gaan testen
-    #min_samples_leaf, minimaal aantal samples die nodig zijn bij een leaf node, dus met hoeveel je uiteindelijk een keus maakt --> ook testen
-    #max_features, waordt er gekenen naar het maximaal aantal features die een boom gebruikt om een boom te maken --> redelijk relevant, miss ook voor featureselection
-    #bootstrap --> is relevant, moet aanstaan
-    #random_state --> kan denk ik wel nuttig zijn tijdens het testen, maar ook half
-
-
-    #oob_scire --> out of bag, kan relevant miss ook in plaats van crossvalidation
-    #max_samples --> kan relevant zijn, maar ik zou dit niet als eerste testen, als je het niet test is dat denk ik ook prima
-
-    #min_weight_fraction_leaf --> is een andere methode van het aantal uiteindelijk samples bepalen, hoeft niet uitgetest te worden
-    #max_leaf_nodes wordt gekeken naar hoeveel leafs er maximaal zijn, kan je denk ik beter met andere features doen
-    #min_impurity_decrease, de minimale verbetering --> ik denk dat dit heel lastig is, voorkomt miss overfitting, maar ik denk dat dit te veel extra is
-    #n_jobs, hij gaat dan meerdere dingen tegelijk doen, is denk ik niet heel relevant
-    #verbose, niet heel nuttig geeft je eventueel meer inzicht over hoever die is
-    #warm_start --> herbruikt dan de vorige call om beter te fitten, maar ik denk dat wij dit juist niet willen
-    #ccp_alpha --> kan gebruikt worden voor overfitten maar is denk ik nu onnodig complex
-    #monotonic_cst, je kan beperkingen aan de richting van invloed van features, is denk ik onnodig ingewikkeld
+    
     random_forest=RandomForestRegressor(n_estimators=n_estimators,  criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split,
                                                          min_samples_leaf=min_samples_leaf,min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features, 
                                                          max_leaf_nodes=max_leaf_nodes, min_impurity_decrease=min_impurity_decrease, bootstrap=bootstrap, 
@@ -489,7 +485,7 @@ def make_data_sources_dict(X_train_raw):
     X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
     X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
     X_train_pca95 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.95)
-    X_train_cleaned = data_cleaning(X_train_raw)
+    X_train_cleaned, mean_value_list_train, irrelevant_features_train = data_cleaning_train(X_train_raw)
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
     X_train_cleaned_pc_scores, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
     X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.66)
