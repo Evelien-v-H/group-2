@@ -18,7 +18,7 @@ from rdkit.Chem import rdFingerprintGenerator
 
 import peptidy as pep
 
-from peptidy import descriptors
+from peptidy import *
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_score, GridSearchCV, RandomizedSearchCV
@@ -169,12 +169,35 @@ class protein:
         onehot=pep.one_hot_encoding(sequence,822) #longest protein is 822 amino acids
         return onehot
     
-    def extract_features(self, sequence):
+    def extract_global_descriptors(self, sequence):
         """extracts the protein features from the amino acid sequence using peptidy. 
         Returns a list of all numerical features from peptidy of this protein"""    
-        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
-        peptidy_features_list = list(peptidy_features_dict.values())
-        return peptidy_features_list
+        peptidy_features_dict = pep.descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
+        peptidy_global_features_list = list(peptidy_features_dict.values())
+        return peptidy_global_features_list
+    
+    def extract_local_descriptors(self, sequence):
+        all_aa_descr = pep.aminoacid_descriptor_encoding(sequence, descriptor_names=None)
+        return all_aa_descr
+
+    def compute_window_descriptors(self, all_residue_descr, window_start, window_stop):
+        """computes the mean, sum, variance, and maximum of each descriptor for the window of amino acid residues
+        specified by window_start (inclusive) and window_stop (exclusive).
+        Input:
+        all_residue_descr (np.array): all descriptors computed per residue, of shape (n_resiudes, n_descr)
+        window_start (int): specifies the index of the first residue of the current window
+        window_stop (int): specifies the index of the first residue not included in the current window
+        Returns:
+        a list with the mean, sum, variance, and maximum of each of the amino acid descriptors for the residue in the current window"""
+        n_residues, n_descr = np.shape(all_residue_descr)
+        window_descriptors = []
+        for descriptor in range(n_descr):
+            mean = np.mean(all_residue_descr[descriptor][window_start:window_stop])            #checken ivm inclusief/exclusief window_stop
+            sum = np.sum(all_residue_descr[descriptor][window_start:window_stop])
+            variance = np.var(all_residue_descr[descriptor][window_start:window_stop])
+            max = max(all_residue_descr[descriptor][window_start:window_stop])
+            window_descriptors.extend((mean, sum, variance, max))
+        return window_descriptors
 
 def train_validation_split(X_train, y_train, percentage):
     """This function splits the data randomly into training data set and a validation
@@ -392,7 +415,7 @@ def combining_all_features(datafile, features=True, topological=True, morgan=Tru
             ligand_macckeys=ligand.macckeys()
 
         peptide=protein(UNIProt_ID[i], uniprot_dict)
-        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
+        peptide_features_list=peptide.extract_global_descriptors(peptide.uniprot2sequence())
         peptide_features=np.array(peptide_features_list)
         if features==True:
             if topological==True:
