@@ -1,6 +1,6 @@
 run=False
 testing=False
-kaggle=True
+kaggle=False
 tuning=False
 
 import pandas as pd
@@ -176,28 +176,50 @@ class protein:
         peptidy_global_features_list = list(peptidy_features_dict.values())
         return peptidy_global_features_list
     
-    def extract_local_descriptors(self, sequence):
-        all_aa_descr = pep.aminoacid_descriptor_encoding(sequence, descriptor_names=None)
-        return all_aa_descr
-
-    def compute_window_descriptors(self, all_residue_descr, window_start, window_stop):
-        """computes the mean, sum, variance, and maximum of each descriptor for the window of amino acid residues
-        specified by window_start (inclusive) and window_stop (exclusive).
-        Input:
-        all_residue_descr (np.array): all descriptors computed per residue, of shape (n_resiudes, n_descr)
-        window_start (int): specifies the index of the first residue of the current window
-        window_stop (int): specifies the index of the first residue not included in the current window
-        Returns:
-        a list with the mean, sum, variance, and maximum of each of the amino acid descriptors for the residue in the current window"""
+    def extract_all_local_descriptors(self, sequence):
+        all_aa_descr = pep.encoding.aminoacid_descriptor_encoding(sequence, descriptor_names=None)
+        return np.array(all_aa_descr)  #shape: (n_residues, n_descriptors)
+    
+    def compute_window_based_features(self, sequence, all_residue_descr):
+        """
+        computes mean, variance, and max of each window descriptor (mean, and variance of each residue descriptor)
+        and aggregates these into a list. This is done for three different window sizes, which adds different distances of interactions 
+        that all have different biological relevance. Per window size, the function iterates over the residues and looks at a subsequence
+        of length window_size each time. For each window,
+          """
+        ####
         n_residues, n_descr = np.shape(all_residue_descr)
-        window_descriptors = []
-        for descriptor in range(n_descr):
-            mean = np.mean(all_residue_descr[descriptor][window_start:window_stop])            #checken ivm inclusief/exclusief window_stop
-            sum = np.sum(all_residue_descr[descriptor][window_start:window_stop])
-            variance = np.var(all_residue_descr[descriptor][window_start:window_stop])
-            max = max(all_residue_descr[descriptor][window_start:window_stop])
-            window_descriptors.extend((mean, sum, variance, max))
-        return window_descriptors
+        aggregated_window_descr = []
+        for window_size in [4,8,15]:            #three different window sizes for short, medium, and long-range interactions
+            for descriptor in range(n_descr):
+                window_statistics = []
+                for window_start in range(0, len(sequence), window_size):
+                    window_stop = window_start + window_size
+                    mean = np.mean(all_residue_descr[window_start:window_stop, descriptor])
+                    variance = np.var(all_residue_descr[window_start:window_stop, descriptor])
+                    window_statistics.append([mean, variance]) 
+                window_statistics = np.array(window_statistics)             #shape: (n_residues/window_size , 2)
+
+                for window_statistic in range(np.shape(window_statistics)[1]):
+                    mean = np.mean(all_residue_descr[:, window_statistic])      #calculates the mean over all windows of each window statistic
+                    sum = np.sum(all_residue_descr[:, window_statistic])
+                    variance = np.var(all_residue_descr[:, window_statistic])
+                    max = max(all_residue_descr[:, window_statistic])
+                    aggregated_window_descr.extend(mean, sum, variance, max)
+        
+        return aggregated_window_descr      #a long list of all window-based protein descriptors, maybe better to convert it to 1D np.array. length = 8*n_descr
+
+    def compute_autocorrelation_features(self, sequence, all_residue_descr):
+        n_residues, n_descr = np.shape(all_residue_descr)
+        autocorrelation_features = []
+        for descr in range(n_descr):
+            current_descr_values = all_residue_descr[:, descr]
+            descr_scaled = current_descr_values - np.mean(current_descr_values)
+            correlation = np.correlate(descr_scaled, descr_scaled, mode='full')
+            for lag in [1,4,10]:
+                autocorrelation_features.append(correlation[lag])
+        return autocorrelation_features                 #a list of all autocorrelation_based features, length is 3*n_descr
+
 
 def train_validation_split(X_train, y_train, percentage):
     """This function splits the data randomly into training data set and a validation
@@ -711,3 +733,7 @@ if kaggle==True:
     print("the model is trained en data is predicted")
     print("this took " + str(endtime-starttime) + " seconds")
 
+sequences_dict = extract_sequence('data/protein_info.csv')
+test_protein = protein('O14757', sequences_dict)
+test_sequence = test_protein.uniprot2sequence()
+all_aa_descpr = test_protein.extract_all_local_descriptors(test_sequence)
