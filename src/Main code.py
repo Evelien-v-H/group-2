@@ -1,6 +1,6 @@
 run=False
 testing=False
-kaggle=True
+kaggle=False
 tuning=False
 
 import pandas as pd
@@ -18,7 +18,7 @@ from rdkit.Chem import rdFingerprintGenerator
 
 import peptidy as pep
 
-from peptidy import descriptors
+from peptidy import *
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_score, GridSearchCV, RandomizedSearchCV
@@ -169,12 +169,58 @@ class protein:
         onehot=pep.one_hot_encoding(sequence,822) #longest protein is 822 amino acids
         return onehot
     
-    def extract_features(self, sequence):
+    def extract_global_descriptors(self, sequence):
         """extracts the protein features from the amino acid sequence using peptidy. 
         Returns a list of all numerical features from peptidy of this protein"""    
-        peptidy_features_dict = descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
-        peptidy_features_list = list(peptidy_features_dict.values())
-        return peptidy_features_list
+        peptidy_features_dict = pep.descriptors.compute_descriptors(sequence, descriptor_names=None, pH=7)
+        peptidy_global_features_list = list(peptidy_features_dict.values())
+        return peptidy_global_features_list
+    
+    def extract_all_local_descriptors(self, sequence):
+        all_aa_descr = pep.encoding.aminoacid_descriptor_encoding(sequence, descriptor_names=None)
+        return np.array(all_aa_descr)  #shape: (n_residues, n_descriptors)
+    
+    def compute_window_based_features(self, sequence, all_residue_descr):
+        """
+        First computes mean and variance of each residue descriptor within a certain window. 
+        Then, computes mean, sum, variance, and max of these window statistics. 
+        This results in 8 new features per residue descriptor. 
+          """
+        ####
+        n_residues, n_descr = np.shape(all_residue_descr)
+        aggregated_window_descr = []
+        for window_size in [4,8,15]:            #three different window sizes for short, medium, and long-range interactions
+            for descriptor in range(n_descr):
+                window_statistics = []
+                for window_start in range(0, len(sequence), window_size):
+                    window_stop = window_start + window_size
+                    mean = np.mean(all_residue_descr[window_start:window_stop, descriptor])
+                    variance = np.var(all_residue_descr[window_start:window_stop, descriptor])
+                    window_statistics.append([mean, variance]) 
+                window_statistics = np.array(window_statistics)             #shape: (n_residues/window_size , 2)
+
+                for window_statistic in range(np.shape(window_statistics)[1]):
+                    mean = np.mean(all_residue_descr[:, window_statistic])      #calculates the mean over all windows of each window statistic
+                    sum = np.sum(all_residue_descr[:, window_statistic])
+                    variance = np.var(all_residue_descr[:, window_statistic])
+                    max = max(all_residue_descr[:, window_statistic])
+                    aggregated_window_descr.extend(mean, sum, variance, max)
+        
+        return aggregated_window_descr      #a long list of all window-based protein descriptors, maybe better to convert it to 1D np.array. length = 8*n_descr
+
+    def compute_autocorrelation_features(self, all_residue_descr):
+        """computes the autocorrelation for three different lags, all 
+        having different biological relevance because they capture different ranges of interaction."""
+        n_residues, n_descr = np.shape(all_residue_descr)
+        autocorrelation_features = []
+        for descr in range(n_descr):
+            current_descr_values = all_residue_descr[:, descr]
+            descr_scaled = current_descr_values - np.mean(current_descr_values)
+            correlation = np.correlate(descr_scaled, descr_scaled, mode='full')
+            for lag in [1,4,10]:
+                autocorrelation_features.append(correlation[lag])
+        return autocorrelation_features                 #a list of all autocorrelation_based features, length is 3*n_descr
+
 
 def train_validation_split(X_train, y_train, percentage):
     """This function splits the data randomly into training data set and a validation
@@ -392,7 +438,7 @@ def combining_all_features(datafile, features=True, topological=True, morgan=Tru
             ligand_macckeys=ligand.macckeys()
 
         peptide=protein(UNIProt_ID[i], uniprot_dict)
-        peptide_features_list=peptide.extract_features(peptide.uniprot2sequence())
+        peptide_features_list=peptide.extract_global_descriptors(peptide.uniprot2sequence())
         peptide_features=np.array(peptide_features_list)
         if features==True:
             if topological==True:
@@ -688,3 +734,7 @@ if kaggle==True:
     print("the model is trained en data is predicted")
     print("this took " + str(endtime-starttime) + " seconds")
 
+sequences_dict = extract_sequence('data/protein_info.csv')
+test_protein = protein('O14757', sequences_dict)
+test_sequence = test_protein.uniprot2sequence()
+all_aa_descpr = test_protein.extract_all_local_descriptors(test_sequence)
