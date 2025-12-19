@@ -182,10 +182,9 @@ class protein:
     
     def compute_window_based_features(self, sequence, all_residue_descr):
         """
-        computes mean, variance, and max of each window descriptor (mean, and variance of each residue descriptor)
-        and aggregates these into a list. This is done for three different window sizes, which adds different distances of interactions 
-        that all have different biological relevance. Per window size, the function iterates over the residues and looks at a subsequence
-        of length window_size each time. For each window,
+        First computes mean and variance of each residue descriptor within a certain window. 
+        Then, computes mean, sum, variance, and max of these window statistics. 
+        This results in 8 new features per residue descriptor. 
           """
         ####
         n_residues, n_descr = np.shape(all_residue_descr)
@@ -209,7 +208,9 @@ class protein:
         
         return aggregated_window_descr      #a long list of all window-based protein descriptors, maybe better to convert it to 1D np.array. length = 8*n_descr
 
-    def compute_autocorrelation_features(self, sequence, all_residue_descr):
+    def compute_autocorrelation_features(self, all_residue_descr):
+        """computes the autocorrelation for three different lags, all 
+        having different biological relevance because they capture different ranges of interaction."""
         n_residues, n_descr = np.shape(all_residue_descr)
         autocorrelation_features = []
         for descr in range(n_descr):
