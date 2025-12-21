@@ -183,7 +183,9 @@ class protein:
         """
         First computes mean and variance of each residue descriptor within a certain window. 
         Then, computes mean, sum, variance, and max of these window statistics. 
-        This results in 8 new features per residue descriptor. 
+        This results in 8 new features per residue descriptor per window size.
+        With the three window sizes for short-range, medium-range, and long-range interactions, 
+        this results in 24 features per residue descriptor. 
           """
         n_residues, n_descr = np.shape(all_residue_descr)
         aggregated_window_descr = []
@@ -201,10 +203,10 @@ class protein:
                     mean = np.mean(window_statistics[:, window_statistic])      #calculates the mean over all windows of each window statistic
                     sum = np.sum(window_statistics[:, window_statistic])
                     variance = np.var(window_statistics[:, window_statistic])
-                    max = max(window_statistics[:, window_statistic])
-                    aggregated_window_descr.extend([mean, sum, variance, max])
+                    max_val = max(window_statistics[:, window_statistic])
+                    aggregated_window_descr.extend([mean, sum, variance, max_val])
         
-        return aggregated_window_descr      #a long list of all window-based protein descriptors, length = 8*n_descr
+        return aggregated_window_descr      #a long list of all window-based protein descriptors, length = 24*n_descr
 
     def compute_autocorrelation_features(self, all_residue_descr):
         """computes the autocorrelation for three different lags, all 
@@ -1012,4 +1014,3 @@ if kaggle==True:
     endtime=time.time()
     print("the model is trained en data is predicted")
     print("this took " + str(endtime-starttime) + " seconds")
-
