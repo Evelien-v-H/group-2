@@ -185,7 +185,6 @@ class protein:
         Then, computes mean, sum, variance, and max of these window statistics. 
         This results in 8 new features per residue descriptor. 
           """
-        ####
         n_residues, n_descr = np.shape(all_residue_descr)
         aggregated_window_descr = []
         for window_size in [4,8,15]:            #three different window sizes for short, medium, and long-range interactions
@@ -199,13 +198,13 @@ class protein:
                 window_statistics = np.array(window_statistics)             #shape: (n_residues/window_size , 2)
 
                 for window_statistic in range(np.shape(window_statistics)[1]):
-                    mean = np.mean(all_residue_descr[:, window_statistic])      #calculates the mean over all windows of each window statistic
-                    sum = np.sum(all_residue_descr[:, window_statistic])
-                    variance = np.var(all_residue_descr[:, window_statistic])
-                    max = max(all_residue_descr[:, window_statistic])
-                    aggregated_window_descr.extend(mean, sum, variance, max)
+                    mean = np.mean(window_statistics[:, window_statistic])      #calculates the mean over all windows of each window statistic
+                    sum = np.sum(window_statistics[:, window_statistic])
+                    variance = np.var(window_statistics[:, window_statistic])
+                    max = max(window_statistics[:, window_statistic])
+                    aggregated_window_descr.extend([mean, sum, variance, max])
         
-        return aggregated_window_descr      #a long list of all window-based protein descriptors, maybe better to convert it to 1D np.array. length = 8*n_descr
+        return aggregated_window_descr      #a long list of all window-based protein descriptors, length = 8*n_descr
 
     def compute_autocorrelation_features(self, all_residue_descr):
         """computes the autocorrelation for three different lags, all 
