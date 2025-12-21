@@ -57,4 +57,6 @@ array3=[7,8,9]
 matrix=np.vstack((array,array1))
 matrix=np.vstack((matrix,array3))
 
-print(data_cleaning(matrix))
+for i in range(3):
+    print(matrix[i:i+1,:])
+    print('/n')

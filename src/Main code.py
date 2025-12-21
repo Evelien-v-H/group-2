@@ -1,5 +1,4 @@
-run=False
-testing=False
+run=True
 kaggle=False
 tuning=False
 
@@ -417,81 +416,356 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     return random_forest 
 
 
-def combining_all_features(datafile, features=True, topological=True, morgan=True, macckeys=True):
+def extract_all_features(datafile,ligandf=True,topologicalf=True,morganf=True,
+                         macckeysf=True,peptidef=True,windowbasedf=True,autocorrelationf=True):
+    """this function makes a dictionary with all the different datasets. 
+    Input is a csv-file with a format of the trainingset and testset.
+    Other input are for determine which features need to be extracted.
+    Output is a dictionary with as key the name of the feature and as 
+    value an array of values per sample"""
+
+    SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID(datafile)
+    uniprot_dict=extract_sequence("data/protein_info.csv")
+    dictionary={}
+    ligand_list=[]
+    topological_list=[]
+    morgan_list=[]
+    macckeys_list=[]
+    peptide_list=[]
+    windowbased_list=[]
+    autocorrelation_list=[]
+
+    for i in range(len(SMILES)):
+        ligand=small_molecule(SMILES[i])
+        peptide=protein(UNIProt_ID[i], uniprot_dict)
+        sequence=peptide.uniprot2sequence()
+        all_residue_descr=peptide.extract_all_local_descriptors(sequence)
+        if ligandf==True:
+            ligand_features=ligand.rdkit_descriptor()
+            ligand_list.append(ligand_features)
+        if topologicalf==True:
+            ligand_topological=ligand.topological_fingerprints()
+            topological_list.append(ligand_topological)
+        if morganf==True:
+            ligand_morgan=ligand.morgan_fingerprint()
+            morgan_list.append(ligand_morgan)
+        if macckeysf==True:
+            ligand_macckeys=ligand.macckeys()
+            macckeys_list.append(ligand_macckeys)
+        if peptidef==True:
+            peptide_features_list=peptide.extract_global_descriptors(sequence)
+            peptide_features=np.array(peptide_features_list)
+            peptide_list.append(peptide_features)
+        if windowbasedf==True:
+            peptide_windowbased_list=peptide.compute_window_based_features(sequence,all_residue_descr)
+            peptide_windowbased=np.array(peptide_windowbased_list)
+            windowbased_list.append(peptide_windowbased)
+        if autocorrelationf==True:
+            peptide_autocorrelation_list=peptide.compute_autocorrelation_features(sequence,all_residue_descr)
+            peptide_autocorrelation=np.array(peptide_autocorrelation_list)
+            autocorrelation_list.append(peptide_autocorrelation)
+
+    if ligandf==True:
+        dictionary['ligandf']=np.array(ligand_list)
+    if topologicalf==True:
+        dictionary['topologicalf']=np.array(topological_list)
+    if morganf==True:
+        dictionary['morganf']=np.array(morgan_list)
+    if macckeysf==True:
+        dictionary['macckeysf']=np.array(macckeys_list)
+    if peptidef==True:
+        dictionary['peptidef']=np.array(peptide_list)
+    if windowbasedf==True:
+        dictionary['windowbasedf']=np.array(windowbased_list)
+    if autocorrelationf==True:
+        dictionary['autocorrelationf']=np.array(autocorrelation_list)
+    
+    return dictionary,affinity
+
+def combining_all_features(dictionary, affinity, ligandf=True, topological=True, morgan=True, 
+                           macckeys=True, peptidef=True, windowbased=True, autocorrelation=True):
     """This functions makes an matrix with the descriptors from the ligands and proteins in the file
     
-    Input: csv-file with a format of the trainingset (trainset: first colom:SMILES, second colom:UNIProt_ID, third colom: affinity) or testset(first colom:numbers, second colom:SMILES, third colom:UNIProt_ID)
+    Input: dictionary made in extract_all_features
     
     Output: matrix (n_samples*n_features) and affinity (np.array of length n_samples)
     """
-    SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID(datafile)
-    uniprot_dict=extract_sequence("data/protein_info.csv")
-    for i in range(len(SMILES)):
-        ligand=small_molecule(SMILES[i])
-        if features==True:
-            ligand_features=ligand.rdkit_descriptor()
-        if topological==True:
-            ligand_topological=ligand.topological_fingerprints()
-        if morgan==True:
-            ligand_morgan=ligand.morgan_fingerprint()
-        if macckeys==True:
-            ligand_macckeys=ligand.macckeys()
+    if ligandf==True:
+        lf=dictionary['ligandf']
+    if topological==True:
+        tf=dictionary['topologicalf']
+    if morgan==True:
+        mo=dictionary['morganf']
+    if macckeys==True:
+        ma=dictionary['macckeysf']
+    if peptidef==True:
+        pf=dictionary['peptidef']
+    if windowbased==True:
+        wb=dictionary['windowbasedf']
+    if autocorrelation==True:
+        ac=dictionary['autocorrelationf']
 
-        peptide=protein(UNIProt_ID[i], uniprot_dict)
-        peptide_features_list=peptide.extract_global_descriptors(peptide.uniprot2sequence())
-        peptide_features=np.array(peptide_features_list)
-        if features==True:
-            if topological==True:
-                if morgan==True:
-                    if macckeys==True:
-                        all_features=np.concatenate((ligand_features,ligand_topological,ligand_morgan,ligand_macckeys,peptide_features))
-                    else:
-                        all_features=np.concatenate((ligand_features,ligand_topological,ligand_morgan,peptide_features))
-                else:
-                    if macckeys==True:
-                        all_features=np.concatenate((ligand_features,ligand_topological,ligand_macckeys,peptide_features))
-                    else:
-                        all_features=np.concatenate((ligand_features,ligand_topological,peptide_features))
-            else:
-                if morgan==True:
-                    if macckeys==True:
-                        all_features=np.concatenate((ligand_features,ligand_morgan,ligand_macckeys,peptide_features))
-                    else:
-                        all_features=np.concatenate((ligand_features,ligand_morgan,peptide_features))
-                else:
-                    if macckeys==True:
-                        all_features=np.concatenate((ligand_features,ligand_macckeys,peptide_features))
-                    else:
-                        all_features=np.concatenate((ligand_features, peptide_features))
-        else:
-            if topological==True:
-                if morgan==True:
-                    if macckeys==True:
-                        all_features=np.concatenate((ligand_topological,ligand_morgan,ligand_macckeys,peptide_features))
-                    else:
-                        all_features=np.concatenate((ligand_topological,ligand_morgan,peptide_features))
-                else:
-                    if macckeys==True:
-                        all_features=np.concatenate((ligand_topological,ligand_macckeys,peptide_features))
-                    else:
-                        all_features=np.concatenate((ligand_topological,peptide_features))
-            else:
-                if morgan==True:
-                    if macckeys==True:
-                        all_features=np.concatenate((ligand_morgan,ligand_macckeys,peptide_features))
-                    else:
-                        all_features=np.concatenate((ligand_morgan,peptide_features))
-                else:
-                    if macckeys==True:
-                        all_features=np.concatenate((ligand_macckeys,peptide_features))
-                    else:
-                        raise RuntimeError("at least one must be true")
+
+    if ligandf==True and topological==True and morgan==True and macckeys==True:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,mo,ma,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,mo,ma,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,mo,ma,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,mo,ma,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,mo,ma,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,mo,ma,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,mo,ma,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==True and topological==True and morgan==True and macckeys==False:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,mo,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,mo,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,mo,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,mo,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,mo,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,mo,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,mo,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==True and topological==True and morgan==False and macckeys==True:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,ma,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,ma,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,ma,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,ma,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,ma,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,ma,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,ma,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==True and topological==False and morgan==True and macckeys==True:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,mo,ma,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,mo,ma,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,mo,ma,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,mo,ma,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([lf,mo,ma,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,mo,ma,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,mo,ma,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==False and topological==True and morgan==True and macckeys==True:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([tf,mo,ma,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([tf,mo,ma,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([tf,mo,ma,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([tf,mo,ma,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([tf,mo,ma,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([tf,mo,ma,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([tf,mo,ma,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==True and topological==True and morgan==False and macckeys==False:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,tf,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,tf,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==True and topological==False and morgan==True and macckeys==False:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,mo,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,mo,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,mo,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,mo,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([lf,mo,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,mo,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,mo,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==True and topological==False and morgan==False and macckeys==True:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,ma,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,ma,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,ma,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,ma,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([lf,ma,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,ma,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,ma,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==False and topological==True and morgan==True and macckeys==False:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([tf,mo,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([tf,mo,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([tf,mo,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([tf,mo,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([tf,mo,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([tf,mo,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([tf,mo,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==False and topological==True and morgan==False and macckeys==True:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([tf,ma,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([tf,ma,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([tf,ma,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([tf,ma,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([tf,ma,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([tf,ma,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([tf,ma,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==False and topological==False and morgan==True and macckeys==True:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([mo,ma,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([mo,ma,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([mo,ma,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([mo,ma,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([mo,ma,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([mo,ma,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([mo,ma,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==True and topological==False and morgan==False and macckeys==False:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([lf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([lf,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([lf,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([lf,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==False and topological==True and morgan==False and macckeys==False:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([tf,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([tf,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([tf,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([tf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([tf,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([tf,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([tf,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==False and topological==False and morgan==True and macckeys==False:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([mo,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([mo,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([mo,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([mo,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([mo,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([mo,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([mo,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==False and topological==False and morgan==False and macckeys==True:
+            if peptidef==True and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([ma,pf,wb,ac],axis=1)
+            elif peptidef==True and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([ma,pf,wb],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([ma,pf,ac],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==True:
+                all_features=np.concatenate([ma,wb,ac],axis=1)
+            elif peptidef==True and windowbased==False and autocorrelation==False:
+                all_features=np.concatenate([ma,pf],axis=1)
+            elif peptidef==False and windowbased==True and autocorrelation==False:
+                all_features=np.concatenate([ma,wb],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==True:
+                all_features=np.concatenate([ma,ac],axis=1)
+            elif peptidef==False and windowbased==False and autocorrelation==False:
+                raise RuntimeError("at least 1 peptide feature needs to be true")
+    elif ligandf==False and topological==False and morgan==False and macckeys==False:
+            raise RuntimeError("at least 1 ligand feature needs to be true")
                         
-        if i==0:
-            matrix=all_features
-        
-        else:
-            matrix=np.vstack((matrix,all_features))
+
+    matrix=all_features
 
     return matrix,affinity
 
@@ -522,39 +796,39 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
 
 
 #Code voor Iris om te testen welke data source het beste is
-def data_sources_training():
-    X,y = combining_all_features('data/train.csv')
-    train_set, validation_set = train_validation_split(X, y, 0.8)      #splits 20% of the data to the validation set, which is reserved for evaluation of the final model
-    X_train_raw, y_train = train_set
-    data_sources_dict = make_data_sources_dict(X_train_raw)
-    best_data_source(data_sources_dict, y_train)
-    return
-
+def data_sources_training(dictionary,affinity,ligandf=True, topological=True, morgan=True, macckeys=True, peptidef=True, windowbased=True, autocorrelation=True):
+    X,y = combining_all_features(dictionary, affinity, ligandf, topological, morgan, macckeys, peptidef, windowbased, autocorrelation)
+    data_sources_dict = make_data_sources_dict(X)
+    highest_cv_score,best_datasource=best_data_source(data_sources_dict, y)
+    return highest_cv_score,best_datasource
 
 def make_data_sources_dict(X_train_raw):
     """applies cleaning, scaling, and pca where relevant.
     returns the dictionary that can be used for the test_data_source function. 
     This dictionary includes all data that will be tried for selecting the best input data:
         - scaled
-        - cleaned (= outliers removed)
+        - cleaned (=clipping outliers)
         - cleaned + scaled
         - scaled and transformed into pca feature space with enough features to explain 60% of variance
         - scaled and transformed, 80%
         - scaled and transformed, 95%
         - the previous three but with the cleaning step"""
     
-    scaler = set_scaling(X_train_raw)
-    X_train_scaled = data_scaling(scaler, X_train_raw)
+    X_train, mean_value_coloms, irrelevant_colums=data_cleaning_train(X_train_raw)
+
+    scaler = set_scaling(X_train)
+    X_train_scaled = data_scaling(scaler, X_train)
     X_train_pc_scores, variance_per_pc = fit_PCA(X_train_scaled)
     X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
     X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
     X_train_pca95 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.95)
-    X_train_cleaned, mean_value_list_train, irrelevant_features_train = data_cleaning_train(X_train_raw)
+    X_train_cleaned, percetile_list = clipping_outliers_train(X_train)
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
     X_train_cleaned_pc_scores, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
     X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.66)
     X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.80)
     X_train_cleaned_pca95 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.95)
+    
 
     data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled, 
                          'Scaled+pca66':X_train_pca66, 'Scaled+pca80':X_train_pca80, 'Scaled+pca95':X_train_pca95,
@@ -569,12 +843,13 @@ def best_data_source(data_sources_dict, y_train):
         estimator = RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
-        mean_cv_score = cross_val_score(estimator, current_X_train, y_train, cv=5).mean()
+        mean_cv_score = cross_val_score(estimator, current_X_train, y_train, cv=3).mean()
         print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
         if mean_cv_score > highest_cv_score:        
             highest_cv_score = mean_cv_score
-            best_data_source = current_data_source          #keeps track of the best data source thus far
-    print(f'The best data source is {best_data_source}')
+            best_datasource = current_data_source          #keeps track of the best data source thus far
+    print(f'The best data source is {best_datasource}')
+    return highest_cv_score, best_datasource
 
 
 def kaggle_submission(X_test,model,filename):
@@ -650,80 +925,85 @@ if run is True:
     starttime=time.time()
     print("started")
     bestscore=0
-    bestfeatures=False
-    besttopological=True
-    bestmorgan=True
-    bestmacckeys=True
-    if testing==True:
-        for f in range(0,2):
-            for t in range(0,2):
-                for mo in range(0,2):
-                    for ma in range(0,2):
-                        if f==1 and t==1 and mo==1 and ma==1:
-                            pass
-                        else:
-                            if f==0:
-                                features=True
-                            else:
-                                features=False
-                            if t==0:
-                                topological=True
-                            else:
-                                topological=False
-                            if mo==0:
-                                morgan=True
-                            else:
-                                morgan=False
-                            if ma==0:
-                                macckeys=True
-                            else:
-                                macckeys=False
-                            X,y=combining_all_features("data/train.csv",features=features,topological=topological,morgan=morgan,macckeys=macckeys)
-                            training,validation=train_validation_split(X,y,0.8)
-                            X_training,y_training=training
-                            X_validation,y_validation=validation
-                            print("data is prepared")
-                            scaler=set_scaling(X_training)
-                            X_training_scaled=data_scaling(scaler,X_training)
-                            X_validation_scaled=data_scaling(scaler,X_validation)
-                            print("data is scaled")
-                            model=train_model(X_training_scaled,y_training)
-                            print("model is trained")
-                            score=RF_error(model,X_validation_scaled,y_validation)
-                            print("features="+str(features)+" and topological="+str(topological)+" and morgan="+str(morgan)+" and macckeys="+str(macckeys)+" -> score="+str(score))
-                            if score>bestscore:
-                                bestscore=score
-                                bestfeatures=features
-                                besttopological=topological
-                                bestmorgan=morgan
-                                bestmacckeys=macckeys
-                            print("score is calculated for features="+str(features)+" and topological="+str(topological)+" and morgan="+str(morgan)+" and macckeys="+str(macckeys))
-    X,y=combining_all_features("data/train.csv",features=bestfeatures,topological=besttopological,morgan=bestmorgan,macckeys=bestmacckeys)
-    print("trainingset is prepared")
-    scaler=set_scaling(X)
-    X_scaled=data_scaling(scaler,X)
-    print("trainingset is scaled")
-    X_test,unknown_affinity=combining_all_features("data/test.csv",features=bestfeatures,topological=besttopological,morgan=bestmorgan,macckeys=bestmacckeys)
-    print("testset is prepared")
-    X_test_scaled=data_scaling(scaler,X_test)
-    print("testset is scaled")
-    model=train_model(X_scaled,y)
-    print("model is trained")
-    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
-    print("file is made with predictions")
-    endtime=time.time()
-    print("the model is trained en data is predicted")
-    print("this took " + str(endtime-starttime) + "seconds")
+    data_dictionary,affinity=extract_all_features("data/train.csv")
+    for lf in range(0,2):
+        for tf in range(0,2):
+            for mo in range(0,2):
+                for ma in range(0,2):
+                    for pf in range(0,2):
+                        for wb in range(0,2):
+                            for ac in range(0,2):
+                                if (lf==1 and tf==1 and mo==1 and ma==1) or (pf==1 and wb==1 and ac==1):
+                                    pass
+                                else:
+                                    if lf==0:
+                                        ligandf=True
+                                    else:
+                                        ligandf=False
+                                    if tf==0:
+                                        topological=True
+                                    else:
+                                        topological=False
+                                    if mo==0:
+                                        morgan=True
+                                    else:
+                                        morgan=False
+                                    if ma==0:
+                                        macckeys=True
+                                    else:
+                                        macckeys=False
+                                    if pf==0:
+                                        peptidef=True
+                                    else:
+                                        peptidef=False
+                                    if wb==0:
+                                        windowbased=True
+                                    else:
+                                        windowbased=False
+                                    if ac==0:
+                                        autocorrelation=True
+                                    else:
+                                        autocorrelation=False
+                                        
+                                    print("ligandf="+str(ligandf)+" and topological="+str(topological)+" and morgan="+str(morgan)+" and macckeys="+str(macckeys))
+                                    print("peptidef="+str(peptidef)+" and windowbased="+str(windowbased)+" and autocorrelation="+str(autocorrelation))
+                                    score,best_datasource=data_sources_training(data_dictionary,affinity,ligandf=ligandf, topological=topological, morgan=morgan, macckeys=macckeys, peptidef=peptidef, windowbased=windowbased, autocorrelation=autocorrelation)
+                                    
+                                    if score>bestscore:
+                                        bestscore=score
+                                        bestligandf=ligandf
+                                        besttopological=topological
+                                        bestmorgan=morgan
+                                        bestmacckeys=macckeys
+                                        bestpeptidef=peptidef
+                                        bestwindowbased=windowbased
+                                        bestautocorrelation=autocorrelation
+                                        bestdatasource=best_datasource
+
+                                        print('')
+
+    print("training took "+str((time.time()-starttime)/3600)+" hours")
+    print("")
+    print("best result is: "+str(bestscore))
+    print("and is achieved with the following adjustments:")
+    print("ligandf="+str(bestligandf)+" and topological="+str(besttopological)+" and morgan="+str(bestmorgan)+" and macckeys="+str(bestmacckeys))
+    print("peptidef="+str(bestpeptidef)+" and windowbased="+str(bestwindowbased)+" and autocorrelation="+str(bestautocorrelation))
+    print("datasource="+str(bestdatasource))
+
+    
 
 
 if kaggle==True:
     starttime=time.time()
-    X,y=combining_all_features("data/train.csv",features=False,topological=True,morgan=True,macckeys=True)
+    datadict_train=extract_all_features("data/train.csv")
+    datadict_test=extract_all_features("data/test.csv")
+    X,y=combining_all_features(datadict_train)
+    print("trainingset is prepared")
+    X_test,unknown_affinity=combining_all_features(datadict_test)
+    print("testset is prepared")
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
     print("trainingset is scaled")
-    X_test,unknown_affinity=combining_all_features("data/test.csv",features=False,topological=True,morgan=True,macckeys=True)
-    print("testset is prepared")
     X_test_scaled=data_scaling(scaler,X_test)
     print("testset is scaled")
     model=train_model(X_scaled,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
@@ -734,7 +1014,3 @@ if kaggle==True:
     print("the model is trained en data is predicted")
     print("this took " + str(endtime-starttime) + " seconds")
 
-sequences_dict = extract_sequence('data/protein_info.csv')
-test_protein = protein('O14757', sequences_dict)
-test_sequence = test_protein.uniprot2sequence()
-all_aa_descpr = test_protein.extract_all_local_descriptors(test_sequence)
