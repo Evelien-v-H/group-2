@@ -421,7 +421,7 @@ def extract_all_features(datafile,ligandf=True,topologicalf=True,morganf=True,
                          macckeysf=True,peptidef=True,windowbasedf=True,autocorrelationf=True):
     """this function makes a dictionary with all the different datasets. 
     Input is a csv-file with a format of the trainingset and testset.
-    Other input are for determine which features need to be extracted.
+    Other inputs are for determining which features need to be extracted.
     Output is a dictionary with as key the name of the feature and as 
     value an array of values per sample"""
 
@@ -497,7 +497,7 @@ def extract_all_features(datafile,ligandf=True,topologicalf=True,morganf=True,
     
     return dictionary,affinity
 
-def slicing_features(large_feature_array, n_features_list, bool_list, order_of_encodings=['lf','tf','mo','ma','pf','wb','ac']):
+def slicing_features(large_feature_array, n_features_list, bool_list):
     """
     Parameters:
         large_feature_array (np.array): array of shape (n_samples, total_n_features) with all 
@@ -505,15 +505,12 @@ def slicing_features(large_feature_array, n_features_list, bool_list, order_of_e
             morgan fingerprints, macckeys, peptide features (for the protein as a whole), window-based features, and autocorrelation features.
         n_features_list (list): list of the number of features corresponding to each of the feature types described above, in the same order.
         bool_list (list): contains the booleans corresponding to each feature, in the same order.
-        order_of_encodings (list): can be used to specify the order of encoding if this changes from the default.
     
     Returns:
         sliced_features (np.array): np.array of shape (n_samples, n_features) that consists of all features of which the boolean
             input parameter was set to True.
-        included_encodings (list): all encodings currently included in sliced_features
     
-    """
-    included_encodings=[]                                   #keeps track of the encodings included in the output
+    """                               #keeps track of the encodings included in the output
     cumulative_n_features = np.cumsum(n_features_list)
     sliced_features=None
 
@@ -526,9 +523,8 @@ def slicing_features(large_feature_array, n_features_list, bool_list, order_of_e
                 sliced_features = array_to_be_added         #it is impossible to concatenate something to an empty array
             else:
                 sliced_features = np.concatenate((sliced_features, array_to_be_added), axis=1)
-            included_encodings.append(order_of_encodings[i])
 
-    return sliced_features, included_encodings
+    return sliced_features
 
 def create_tf_combinations(remaining, current):
     """returns list of lists of all possible combinations of True and False. Remaining (int) indicates the length of each list of booleans. 
@@ -574,12 +570,10 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
 
 
 #Code voor Iris om te testen welke data source het beste is
-def data_sources_training(data_sources_dict,n_features_list,affinity,ligandf=True, topological=True, morgan=True, macckeys=True, peptidef=True, windowbased=True, autocorrelation=True):
+def data_sources_training(data_sources_dict,n_features_list,affinity, encoding_booleans):
     splitted_data_dict={}
     for current_data_source, current_X_train in data_sources_dict.items():
-        splitted_X=combining_all_features(current_X_train,n_features_list,ligandf=ligandf,
-                                          topological=topological,morgan=morgan,macckeys=macckeys,
-                                          peptidef=peptidef,windowbased=windowbased,autocorrelation=autocorrelation)
+        splitted_X=slicing_features(current_X_train,n_features_list,encoding_booleans)
         splitted_data_dict[current_data_source]=splitted_X
     
     highest_cv_score,best_datasource=best_data_source(splitted_data_dict, affinity)
@@ -695,7 +689,22 @@ def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomiz
 if tuning is True:
     starttime=time.time()
     print("started tuning")
-    X,y=combining_all_features("data/train.csv",features=False,topological=True,morgan=True,macckeys=True)
+    data_dictionary,affinity=extract_all_features("data/train.csv")
+    lf_array,lf_features=data_dictionary['ligandf']
+    tf_array,tf_features=data_dictionary['topologicalf']
+    mo_array,mo_features=data_dictionary['morganf']
+    ma_array,ma_features=data_dictionary['macckeysf']
+    pf_array,pf_features=data_dictionary['peptidef']
+    wb_array,wb_features=data_dictionary['windowbasedf']
+    ac_array,ac_features=data_dictionary['autocorrelationf']
+    all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+    n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
+    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
+    encoding_bools = []         #Here, you can insert booleans corresponding to every encoding. This is in the order of the list in the previous line.
+    
+    X = slicing_features(all_features, n_features_list, encoding_bools)
+    y = affinity
+
     print("data is prepared")
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
@@ -728,68 +737,33 @@ if run is True:
 
     all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
     n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
+    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
 
     data_sources_dict=make_data_sources_dict(all_features,PCA=False)
+    true_false_combinations = create_tf_combinations(len(n_features_list))
+    valid_tf_combinations = verify_tf_combinations(true_false_combinations)
 
-    for lf in range(0,2):
-        for tf in range(0,2):
-            for mo in range(0,2):
-                for ma in range(0,2):
-                    for pf in range(0,2):
-                        for wb in range(0,2):
-                            for ac in range(0,2):
-                                if (lf==1 and tf==1 and mo==1 and ma==1) or (pf==1 and wb==1 and ac==1):
-                                    pass
-                                else:
-                                    if lf==0:
-                                        ligandf=True
-                                    else:
-                                        ligandf=False
-                                    if tf==0:
-                                        topological=True
-                                    else:
-                                        topological=False
-                                    if mo==0:
-                                        morgan=True
-                                    else:
-                                        morgan=False
-                                    if ma==0:
-                                        macckeys=True
-                                    else:
-                                        macckeys=False
-                                    if pf==0:
-                                        peptidef=True
-                                    else:
-                                        peptidef=False
-                                    if wb==0:
-                                        windowbased=True
-                                    else:
-                                        windowbased=False
-                                    if ac==0:
-                                        autocorrelation=True
-                                    else:
-                                        autocorrelation=False
-                                        
-                                    print("ligandf="+str(ligandf)+" and topological="+str(topological)+" and morgan="+str(morgan)+" and macckeys="+str(macckeys))
-                                    print("peptidef="+str(peptidef)+" and windowbased="+str(windowbased)+" and autocorrelation="+str(autocorrelation))
+    for encoding_bools in valid_tf_combinations:
+        included_encodings = []
+        for i in range(len(encoding_bools)):
+            if encoding_bools[i]:
+                included_encodings.append(order_of_encodings[i])
+        print(f'This iterations uses the features from: {included_encodings}')
+        score, best_datasource=data_sources_training(data_sources_dict,n_features_list,affinity, encoding_booleans=encoding_bools)
+        print(f'The score is {score}')                            
+        if score>bestscore:
+            bestscore = score
+            bestbools = encoding_bools
+            bestligandf = bestbools[0]
+            besttopological = bestbools[1]
+            bestmorgan = bestbools[2]
+            bestmacckeys = bestbools[3]
+            bestpeptidef = bestbools[4]
+            bestwindowbased = bestbools[5]
+            bestautocorrelation = bestbools[6]
+            bestdatasource = best_datasource
 
-                                    score, best_datasource=data_sources_training(data_sources_dict,n_features_list,affinity,
-                                                                                 ligandf=ligandf,topological=topological,morgan=morgan,
-                                                                                 macckeys=macckeys,peptidef=peptidef,windowbased=windowbased,
-                                                                                 autocorrelation=autocorrelation)
-                                    
-                                    if score>bestscore:
-                                        bestscore=score
-                                        bestligandf=ligandf
-                                        besttopological=topological
-                                        bestmorgan=morgan
-                                        bestmacckeys=macckeys
-                                        bestpeptidef=peptidef
-                                        bestwindowbased=windowbased
-                                        bestautocorrelation=autocorrelation
-                                        bestdatasource=best_datasource
-
-                                    print('')
+        print('')
 
     print("training took "+str((time.time()-starttime)/3600)+" hours")
     print("")
@@ -804,11 +778,29 @@ if run is True:
 
 if kaggle==True:
     starttime=time.time()
-    datadict_train=extract_all_features("data/train.csv")
-    datadict_test=extract_all_features("data/test.csv")
-    X,y=combining_all_features(datadict_train)
+    data_dictionary_train, y = extract_all_features("data/train.csv")
+    data_dictionary_test, unknown_affinity  = extract_all_features("data/test.csv")
+
+    for datadict in (data_dictionary_train, data_dictionary_test):
+        lf_array,lf_features=data_dictionary['ligandf']
+        tf_array,tf_features=data_dictionary['topologicalf']
+        mo_array,mo_features=data_dictionary['morganf']
+        ma_array,ma_features=data_dictionary['macckeysf']
+        pf_array,pf_features=data_dictionary['peptidef']
+        wb_array,wb_features=data_dictionary['windowbasedf']
+        ac_array,ac_features=data_dictionary['autocorrelationf']
+        if datadict == data_dictionary_train:
+            all_features_train=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+        else:
+            all_features_test=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+    
+    n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
+    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
+    encoding_bools = []         #Here, you can insert booleans corresponding to every encoding. This is in the order of the list in the previous line.
+    
+    X = slicing_features(all_features, n_features_list, encoding_bools)
     print("trainingset is prepared")
-    X_test,unknown_affinity=combining_all_features(datadict_test)
+    X_test = slicing_features(all_features, n_features_list, encoding_bools)
     print("testset is prepared")
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
