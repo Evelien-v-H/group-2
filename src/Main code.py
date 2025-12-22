@@ -462,7 +462,7 @@ def extract_all_features(datafile,ligandf=True,topologicalf=True,morganf=True,
             peptide_windowbased=np.array(peptide_windowbased_list)
             windowbased_list.append(peptide_windowbased)
         if autocorrelationf==True:
-            peptide_autocorrelation_list=peptide.compute_autocorrelation_features(sequence,all_residue_descr)
+            peptide_autocorrelation_list=peptide.compute_autocorrelation_features(all_residue_descr)
             peptide_autocorrelation=np.array(peptide_autocorrelation_list)
             autocorrelation_list.append(peptide_autocorrelation)
 
