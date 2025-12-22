@@ -510,10 +510,8 @@ def slicing_features(large_feature_array, n_features_list, bool_list, order_of_e
     Returns:
         sliced_features (np.array): np.array of shape (n_samples, n_features) that consists of all features of which the boolean
             input parameter was set to True.
-        included_encodings (list): all encodings currently included in sliced_features
     
-    """
-    included_encodings=[]                                   #keeps track of the encodings included in the output
+    """                               #keeps track of the encodings included in the output
     cumulative_n_features = np.cumsum(n_features_list)
     sliced_features=None
 
@@ -526,9 +524,8 @@ def slicing_features(large_feature_array, n_features_list, bool_list, order_of_e
                 sliced_features = array_to_be_added         #it is impossible to concatenate something to an empty array
             else:
                 sliced_features = np.concatenate((sliced_features, array_to_be_added), axis=1)
-            included_encodings.append(order_of_encodings[i])
 
-    return sliced_features, included_encodings
+    return sliced_features
 
 def create_tf_combinations(remaining, current):
     """returns list of lists of all possible combinations of True and False. Remaining (int) indicates the length of each list of booleans. 
@@ -574,12 +571,10 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
 
 
 #Code voor Iris om te testen welke data source het beste is
-def data_sources_training(data_sources_dict,n_features_list,affinity,ligandf=True, topological=True, morgan=True, macckeys=True, peptidef=True, windowbased=True, autocorrelation=True):
+def data_sources_training(data_sources_dict,n_features_list,affinity, encoding_booleans,order_of_encodings):
     splitted_data_dict={}
     for current_data_source, current_X_train in data_sources_dict.items():
-        splitted_X=combining_all_features(current_X_train,n_features_list,ligandf=ligandf,
-                                          topological=topological,morgan=morgan,macckeys=macckeys,
-                                          peptidef=peptidef,windowbased=windowbased,autocorrelation=autocorrelation)
+        splitted_X=slicing_features(current_X_train,n_features_list,encoding_booleans,order_of_encodings)
         splitted_data_dict[current_data_source]=splitted_X
     
     highest_cv_score,best_datasource=best_data_source(splitted_data_dict, affinity)
@@ -728,68 +723,33 @@ if run is True:
 
     all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
     n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
+    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
 
     data_sources_dict=make_data_sources_dict(all_features,PCA=False)
+    true_false_combinations = create_tf_combinations(len(n_features_list))
+    valid_tf_combinations = verify_tf_combinations(true_false_combinations)
 
-    for lf in range(0,2):
-        for tf in range(0,2):
-            for mo in range(0,2):
-                for ma in range(0,2):
-                    for pf in range(0,2):
-                        for wb in range(0,2):
-                            for ac in range(0,2):
-                                if (lf==1 and tf==1 and mo==1 and ma==1) or (pf==1 and wb==1 and ac==1):
-                                    pass
-                                else:
-                                    if lf==0:
-                                        ligandf=True
-                                    else:
-                                        ligandf=False
-                                    if tf==0:
-                                        topological=True
-                                    else:
-                                        topological=False
-                                    if mo==0:
-                                        morgan=True
-                                    else:
-                                        morgan=False
-                                    if ma==0:
-                                        macckeys=True
-                                    else:
-                                        macckeys=False
-                                    if pf==0:
-                                        peptidef=True
-                                    else:
-                                        peptidef=False
-                                    if wb==0:
-                                        windowbased=True
-                                    else:
-                                        windowbased=False
-                                    if ac==0:
-                                        autocorrelation=True
-                                    else:
-                                        autocorrelation=False
-                                        
-                                    print("ligandf="+str(ligandf)+" and topological="+str(topological)+" and morgan="+str(morgan)+" and macckeys="+str(macckeys))
-                                    print("peptidef="+str(peptidef)+" and windowbased="+str(windowbased)+" and autocorrelation="+str(autocorrelation))
+    for bools_list in valid_tf_combinations:
+        included_encodings = []
+        for i in range(len(bools_list)):
+            if bools_list[i]:
+                included_encodings.append(order_of_encodings[i])
+        print(f'This iterations uses the features from: {included_encodings}')
+        score, best_datasource=data_sources_training(data_sources_dict,n_features_list,affinity, encoding_booleans=bools_list, order_of_encodings=order_of_encodings)
+        print(f'The score is {score}')                            
+        if score>bestscore:
+            bestscore = score
+            bestbools = bools_list
+            bestligandf = bestbools[0]
+            besttopological = bestbools[1]
+            bestmorgan = bestbools[2]
+            bestmacckeys = bestbools[3]
+            bestpeptidef = bestbools[4]
+            bestwindowbased = bestbools[5]
+            bestautocorrelation = bestbools[6]
+            bestdatasource = best_datasource
 
-                                    score, best_datasource=data_sources_training(data_sources_dict,n_features_list,affinity,
-                                                                                 ligandf=ligandf,topological=topological,morgan=morgan,
-                                                                                 macckeys=macckeys,peptidef=peptidef,windowbased=windowbased,
-                                                                                 autocorrelation=autocorrelation)
-                                    
-                                    if score>bestscore:
-                                        bestscore=score
-                                        bestligandf=ligandf
-                                        besttopological=topological
-                                        bestmorgan=morgan
-                                        bestmacckeys=macckeys
-                                        bestpeptidef=peptidef
-                                        bestwindowbased=windowbased
-                                        bestautocorrelation=autocorrelation
-                                        bestdatasource=best_datasource
-
-                                    print('')
+        print('')
 
     print("training took "+str((time.time()-starttime)/3600)+" hours")
     print("")
