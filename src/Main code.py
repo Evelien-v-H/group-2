@@ -467,19 +467,33 @@ def extract_all_features(datafile,ligandf=True,topologicalf=True,morganf=True,
             autocorrelation_list.append(peptide_autocorrelation)
 
     if ligandf==True:
-        dictionary['ligandf']=np.array(ligand_list)
+        ligand_array=np.array(ligand_list)
+        n_samples, lf_features=ligand_array.shape
+        dictionary['ligandf']=ligand_array,lf_features
     if topologicalf==True:
-        dictionary['topologicalf']=np.array(topological_list)
+        topological_array=np.array(topological_list)
+        n_samples, tf_features=topological_array.shape
+        dictionary['topologicalf']=topological_array,tf_features
     if morganf==True:
-        dictionary['morganf']=np.array(morgan_list)
+        morgan_array=np.array(morgan_list)
+        n_samples,mo_features=morgan_array.shape
+        dictionary['morganf']=morgan_array,mo_features
     if macckeysf==True:
-        dictionary['macckeysf']=np.array(macckeys_list)
+        macckeys_array=np.array(macckeys_list)
+        n_samples,ma_feautures=macckeys_array.shape
+        dictionary['macckeysf']=macckeys_array,ma_feautures
     if peptidef==True:
-        dictionary['peptidef']=np.array(peptide_list)
+        peptide_array=np.array(peptide_list)
+        n_samples,pf_features=peptide_array.shape
+        dictionary['peptidef']=peptide_array,pf_features
     if windowbasedf==True:
-        dictionary['windowbasedf']=np.array(windowbased_list)
+        windowbased_array=np.array(windowbased_list)
+        n_samples,wb_features=windowbased_array.shape
+        dictionary['windowbasedf']=windowbased_array,wb_features
     if autocorrelationf==True:
-        dictionary['autocorrelationf']=np.array(autocorrelation_list)
+        autocorrelation_array=np.array(autocorrelation_list)
+        n_samples,ac_features=autocorrelation_array.shape
+        dictionary['autocorrelationf']=autocorrelation_array,ac_features
     
     return dictionary,affinity
 
@@ -797,13 +811,18 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
 
 
 #Code voor Iris om te testen welke data source het beste is
-def data_sources_training(dictionary,affinity,ligandf=True, topological=True, morgan=True, macckeys=True, peptidef=True, windowbased=True, autocorrelation=True):
-    X,y = combining_all_features(dictionary, affinity, ligandf, topological, morgan, macckeys, peptidef, windowbased, autocorrelation)
-    data_sources_dict = make_data_sources_dict(X)
-    highest_cv_score,best_datasource=best_data_source(data_sources_dict, y)
+def data_sources_training(data_sources_dict,n_features_list,affinity,ligandf=True, topological=True, morgan=True, macckeys=True, peptidef=True, windowbased=True, autocorrelation=True):
+    splitted_data_dict={}
+    for current_data_source, current_X_train in data_sources_dict.items():
+        splitted_X=combining_all_features(current_X_train,n_features_list,ligandf=ligandf,
+                                          topological=topological,morgan=morgan,macckeys=macckeys,
+                                          peptidef=peptidef,windowbased=windowbased,autocorrelation=autocorrelation)
+        splitted_data_dict[current_data_source]=splitted_X
+    
+    highest_cv_score,best_datasource=best_data_source(splitted_data_dict, affinity)
     return highest_cv_score,best_datasource
 
-def make_data_sources_dict(X_train_raw):
+def make_data_sources_dict(X_train_raw,PCA=True):
     """applies cleaning, scaling, and pca where relevant.
     returns the dictionary that can be used for the test_data_source function. 
     This dictionary includes all data that will be tried for selecting the best input data:
@@ -819,21 +838,29 @@ def make_data_sources_dict(X_train_raw):
 
     scaler = set_scaling(X_train)
     X_train_scaled = data_scaling(scaler, X_train)
-    X_train_pc_scores, variance_per_pc = fit_PCA(X_train_scaled)
-    X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
-    X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
-    X_train_pca95 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.95)
+    if PCA==True:
+        X_train_pc_scores, variance_per_pc = fit_PCA(X_train_scaled)
+        X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
+        X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
+        X_train_pca95 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.95)
     X_train_cleaned, percetile_list = clipping_outliers_train(X_train)
     X_train_cleaned_scaled = data_scaling(scaler, X_train_cleaned)
-    X_train_cleaned_pc_scores, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
-    X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.66)
-    X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.80)
-    X_train_cleaned_pca95 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.95)
+    if PCA==True:
+        X_train_cleaned_pc_scores, variance_per_pc_cleaned = fit_PCA(X_train_cleaned_scaled)
+        X_train_cleaned_pca66 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.66)
+        X_train_cleaned_pca80 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.80)
+        X_train_cleaned_pca95 = select_principal_components(X_train_cleaned_pc_scores, variance_per_pc_cleaned, 0.95)
     
 
-    data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled, 
-                         'Scaled+pca66':X_train_pca66, 'Scaled+pca80':X_train_pca80, 'Scaled+pca95':X_train_pca95,
-                         'Cleaned+scaled+pca66':X_train_cleaned_pca66, 'Cleaned+scaled+pca80':X_train_cleaned_pca80, 'Cleaned+scaled+pca95':X_train_cleaned_pca95}
+    data_sources_dict = {'Scaled':X_train_scaled, 'Cleaned':X_train_cleaned, 'Cleaned+scaled':X_train_cleaned_scaled}
+    if PCA==True:
+        data_sources_dict['Scaled+pca66']=X_train_pca66
+        data_sources_dict['Scaled+pca80']=X_train_pca80
+        data_sources_dict['Scaled+pca95']=X_train_pca95
+        data_sources_dict['Cleaned+scaled+pca66']=X_train_cleaned_pca66
+        data_sources_dict['Cleaned+scaled+pca80']=X_train_cleaned_pca80
+        data_sources_dict['Cleaned+scaled+pca95']=X_train_cleaned_pca95
+    
     return data_sources_dict
 
 
@@ -843,13 +870,13 @@ def best_data_source(data_sources_dict, y_train):
     for current_data_source, current_X_train in data_sources_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
         estimator = RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+                oob_score=False, n_jobs=-2, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         mean_cv_score = cross_val_score(estimator, current_X_train, y_train, cv=3).mean()
         print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
         if mean_cv_score > highest_cv_score:        
             highest_cv_score = mean_cv_score
             best_datasource = current_data_source          #keeps track of the best data source thus far
-    print(f'The best data source is {best_datasource}')
+    print(f'The best data source is {best_datasource} with score={highest_cv_score}')
     return highest_cv_score, best_datasource
 
 
@@ -926,7 +953,21 @@ if run is True:
     starttime=time.time()
     print("started")
     bestscore=0
+
     data_dictionary,affinity=extract_all_features("data/train.csv")
+    lf_array,lf_features=data_dictionary['ligandf']
+    tf_array,tf_features=data_dictionary['topologicalf']
+    mo_array,mo_features=data_dictionary['morganf']
+    ma_array,ma_features=data_dictionary['macckeysf']
+    pf_array,pf_features=data_dictionary['peptidef']
+    wb_array,wb_features=data_dictionary['windowbasedf']
+    ac_array,ac_features=data_dictionary['autocorrelationf']
+
+    all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+    n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
+
+    data_sources_dict=make_data_sources_dict(all_features,PCA=False)
+
     for lf in range(0,2):
         for tf in range(0,2):
             for mo in range(0,2):
@@ -968,7 +1009,11 @@ if run is True:
                                         
                                     print("ligandf="+str(ligandf)+" and topological="+str(topological)+" and morgan="+str(morgan)+" and macckeys="+str(macckeys))
                                     print("peptidef="+str(peptidef)+" and windowbased="+str(windowbased)+" and autocorrelation="+str(autocorrelation))
-                                    score,best_datasource=data_sources_training(data_dictionary,affinity,ligandf=ligandf, topological=topological, morgan=morgan, macckeys=macckeys, peptidef=peptidef, windowbased=windowbased, autocorrelation=autocorrelation)
+
+                                    score, best_datasource=data_sources_training(data_sources_dict,n_features_list,affinity,
+                                                                                 ligandf=ligandf,topological=topological,morgan=morgan,
+                                                                                 macckeys=macckeys,peptidef=peptidef,windowbased=windowbased,
+                                                                                 autocorrelation=autocorrelation)
                                     
                                     if score>bestscore:
                                         bestscore=score
@@ -981,7 +1026,7 @@ if run is True:
                                         bestautocorrelation=autocorrelation
                                         bestdatasource=best_datasource
 
-                                        print('')
+                                    print('')
 
     print("training took "+str((time.time()-starttime)/3600)+" hours")
     print("")
