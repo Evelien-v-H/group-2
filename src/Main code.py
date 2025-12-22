@@ -516,6 +516,23 @@ def slicing_features(large_feature_array, n_features_list, bool_list, order_of_e
 
     return sliced_features, included_encodings
 
+def create_tf_combinations(remaining, current):
+    """returns list of lists of all possible combinations of True and False. Remaining (int) indicates the length of each list of booleans. 
+    Current should always be [] for this algorithm to work."""
+    if remaining == 0:
+        return [current]
+    with_true = create_tf_combinations(remaining - 1, current + [True])
+    with_false = create_tf_combinations(remaining - 1, current + [False])
+    return with_true + with_false
+
+def verify_tf_combinations(tf_combinations):
+    """ensures all true-false combination lists that are passed onto the rest of the code will have at least one small molecule encoding and one protein encoding
+    set to True. Input: output from function create_tf_combinations."""
+    valid_tf_combinations = []
+    for list_of_bools in tf_combinations:
+        if (list_of_bools[0] or list_of_bools[1] or list_of_bools[2] or list_of_bools[3]) and (list_of_bools[4] or list_of_bools[5] or list_of_bools[6]):
+            valid_tf_combinations.append(list_of_bools)
+    return valid_tf_combinations
 
 def fit_PCA(X, n_components=None):
     """performs a PCA on the data in X (np.array) and 
