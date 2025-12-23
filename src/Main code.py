@@ -519,7 +519,7 @@ def slicing_features(large_feature_array, n_features_list, bool_list):
             start_index = cumulative_n_features[i]
             stop_index = start_index + n_features_list[i]
             array_to_be_added = large_feature_array[:,start_index:stop_index]
-            if sliced_features==None:                       
+            if sliced_features is None:                       
                 sliced_features = array_to_be_added         #it is impossible to concatenate something to an empty array
             else:
                 sliced_features = np.concatenate((sliced_features, array_to_be_added), axis=1)
@@ -740,7 +740,7 @@ if run is True:
     order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
 
     data_sources_dict=make_data_sources_dict(all_features,PCA=False)
-    true_false_combinations = create_tf_combinations(len(n_features_list))
+    true_false_combinations = create_tf_combinations(len(n_features_list),[])
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)
 
     for encoding_bools in valid_tf_combinations:
