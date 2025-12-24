@@ -1,5 +1,5 @@
-run=True
-kaggle=False
+run=False
+kaggle=True
 tuning=False
 
 import pandas as pd
@@ -781,7 +781,12 @@ if kaggle==True:
     data_dictionary_train, y = extract_all_features("data/train.csv")
     data_dictionary_test, unknown_affinity  = extract_all_features("data/test.csv")
 
-    for datadict in (data_dictionary_train, data_dictionary_test):
+    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
+    encoding_bools = [True,True,False,False,True,False,False] #Here, you can insert booleans corresponding to every encoding. This is in the order of the list in the previous line.
+    scaling=False
+    cleaning=True
+
+    for data_dictionary in (data_dictionary_train, data_dictionary_test):
         lf_array,lf_features=data_dictionary['ligandf']
         tf_array,tf_features=data_dictionary['topologicalf']
         mo_array,mo_features=data_dictionary['morganf']
@@ -789,27 +794,48 @@ if kaggle==True:
         pf_array,pf_features=data_dictionary['peptidef']
         wb_array,wb_features=data_dictionary['windowbasedf']
         ac_array,ac_features=data_dictionary['autocorrelationf']
-        if datadict == data_dictionary_train:
+
+        n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
+        
+        if data_dictionary is data_dictionary_train:
             all_features_train=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+            X = slicing_features(all_features_train, n_features_list, encoding_bools)
         else:
             all_features_test=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+            X_test = slicing_features(all_features_test, n_features_list, encoding_bools)
     
-    n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
-    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
-    encoding_bools = []         #Here, you can insert booleans corresponding to every encoding. This is in the order of the list in the previous line.
-    
-    X = slicing_features(all_features, n_features_list, encoding_bools)
     print("trainingset is prepared")
-    X_test = slicing_features(all_features, n_features_list, encoding_bools)
     print("testset is prepared")
-    scaler=set_scaling(X)
-    X_scaled=data_scaling(scaler,X)
-    print("trainingset is scaled")
-    X_test_scaled=data_scaling(scaler,X_test)
-    print("testset is scaled")
-    model=train_model(X_scaled,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
-    print("model is trained")
-    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    if scaling is True:
+        scaler=set_scaling(X)
+        X_scaled=data_scaling(scaler,X)
+        print("trainingset is scaled")
+        X_test_scaled=data_scaling(scaler,X_test)
+        print("testset is scaled")
+        model=train_model(X_scaled,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
+        print("model is trained")
+        kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+
+    if cleaning is True:
+        X_cleaned,clean=clipping_outliers_train(X)
+        X_test_cleaned=clipping_outliers_test(X_test,clean)
+        print("sets are cleaned")
+        model=train_model(X_cleaned,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
+        print("model is trained")
+        kaggle_submission(X_test_cleaned,model,"docs/Kaggle_submission.csv")
+
+    if cleaning is True and scaling is True:
+        scaler=set_scaling(X)
+        X_scaled=data_scaling(scaler,X)
+        print("trainingset is scaled")
+        X_test_scaled=data_scaling(scaler,X_test)
+        print("testset is scaled")
+        X_cleaned_scaled,clean=clipping_outliers_train(X_scaled)
+        X_test_cleaned_scaled=clipping_outliers_test(X_test_scaled,clean)
+        model=train_model(X_cleaned_scaled,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
+        print("model is trained")
+        kaggle_submission(X_test_cleaned_scaled,model,"docs/Kaggle_submission.csv")
+
     print("file is made with predictions")
     endtime=time.time()
     print("the model is trained en data is predicted")
