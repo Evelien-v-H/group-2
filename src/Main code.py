@@ -812,7 +812,7 @@ if kaggle==True:
         print("trainingset is scaled")
         X_test_scaled=data_scaling(scaler,X_test)
         print("testset is scaled")
-        model=train_model(X_scaled,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
+        model=train_model(X_scaled,y, n_estimators=350,min_samples_split=2,min_samples_leaf=1,max_features='sqrt',max_depth=21)
         print("model is trained")
         kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
 
@@ -820,7 +820,7 @@ if kaggle==True:
         X_cleaned,clean=clipping_outliers_train(X)
         X_test_cleaned=clipping_outliers_test(X_test,clean)
         print("sets are cleaned")
-        model=train_model(X_cleaned,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
+        model=train_model(X_cleaned,y, n_estimators=350,min_samples_split=2,min_samples_leaf=1,max_features='sqrt',max_depth=21)
         print("model is trained")
         kaggle_submission(X_test_cleaned,model,"docs/Kaggle_submission.csv")
 
@@ -832,7 +832,7 @@ if kaggle==True:
         print("testset is scaled")
         X_cleaned_scaled,clean=clipping_outliers_train(X_scaled)
         X_test_cleaned_scaled=clipping_outliers_test(X_test_scaled,clean)
-        model=train_model(X_cleaned_scaled,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
+        model=train_model(X_cleaned_scaled,y, n_estimators=350,min_samples_split=2,min_samples_leaf=1,max_features='sqrt',max_depth=21)
         print("model is trained")
         kaggle_submission(X_test_cleaned_scaled,model,"docs/Kaggle_submission.csv")
 
