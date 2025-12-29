@@ -1,6 +1,6 @@
 run=False
-kaggle=True
-tuning=False
+kaggle=False
+tuning=True
 
 import pandas as pd
 import numpy as np
@@ -827,6 +827,8 @@ if kaggle==True:
     starttime=time.time()
     encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    scaling=False
+    cleaning=True
     X,y=extract_true_features("data/train.csv", encoding_bools)
     print("trainingset is prepared")
     X_test,unknown_affinity=extract_true_features("data/test.csv", encoding_bools)
