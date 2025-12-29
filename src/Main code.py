@@ -1,6 +1,6 @@
-run=True
+run=False
 kaggle=False
-tuning=False
+tuning=True
 
 import pandas as pd
 import numpy as np
@@ -38,10 +38,10 @@ def open_data(datafile):
 def data_to_SMILES_UNIProt_ID(datafile):
     """This function splits the dataset in a SMILES array and UNIProt_ID. If the datafile is an trainset than also an affinityscore 
         
-        input: a csv file like the given training or testset with 3 coloms. (trainset: first colom:SMILES, second colom:UNIProt_ID, third colom: affinity)
+        Parameters: a csv file like the given training or testset with 3 coloms. (trainset: first colom:SMILES, second colom:UNIProt_ID, third colom: affinity)
         (testset: first colom:numbers, second colom:SMILES, third colom:UNIProt_ID)
     
-        Output: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore, if it is the testset the
+        Returns: one array with the SMILES, an array with the UNIProt_IDs and an array with the affinityscore, if it is the testset the
         affinityscore is returned with 'unknown affinity'"""
     df=open_data(datafile)
     colom_1=df.iloc[:,0].to_numpy()
@@ -88,7 +88,7 @@ class small_molecule:
         self.molecule=Chem.MolFromSmiles(str(SMILES))
 
 
-    def rdkit_descriptor(self):
+    def rdkit_descriptors(self):
         """This function returns an array with all sorts of descriptors gotten from rdkit
         
         input: self
@@ -175,7 +175,7 @@ class protein:
         peptidy_global_features_list = list(peptidy_features_dict.values())
         return peptidy_global_features_list
     
-    def extract_all_local_descriptors(self, sequence):
+    def extract_residue_descriptors(self, sequence):
         all_aa_descr = pep.encoding.aminoacid_descriptor_encoding(sequence, descriptor_names=None)
         return np.array(all_aa_descr)  #shape: (n_residues, n_descriptors)
     
@@ -416,15 +416,91 @@ def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None
     random_forest.fit(X,y)
     return random_forest 
 
+def extract_true_features(datafile, encoding_bools_dict):
+    """creates the array that can be used for training and predictions of the model. 
+    Parameters:
+        datafile (.csv-file): file in the same format as train.csv and test.csv
+        encoding_bools_dict (dict): contains for each possible encoding a boolean that indicates whether this encoding will be included in the array.
+    Returns: 
+        X (np.array): 2D array of shape (n_samples, n_features) that contains all features from the encodings indicated by encoding_bools_dict
+        affinity (np.array): 1D array of shape (n_samples,) that contains the affinity per sample, as read from the datafile. If datafile does not 
+            contain affinity (in the case of unlabeled data), affinity contain 'unknown affinity' for each sample."""
+    SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID(datafile)
+    uniprot_dict=extract_sequence("data/protein_info.csv")
+    ligand_list=[]
+    topological_list=[]
+    morgan_list=[]
+    macckeys_list=[]
+    peptide_list=[]
+    windowbased_list=[]
+    autocorrelation_list=[]
 
-def extract_all_features(datafile,ligandf=True,topologicalf=True,morganf=True,
-                         macckeysf=True,peptidef=True,windowbasedf=True,autocorrelationf=True):
-    """this function makes a dictionary with all the different datasets. 
-    Input is a csv-file with a format of the trainingset and testset.
-    Other inputs are for determining which features need to be extracted.
-    Output is a dictionary with as key the name of the feature and as 
-    value an array of values per sample"""
+    for i in range(len(SMILES)):
+        ligand=small_molecule(SMILES[i])
+        peptide=protein(UNIProt_ID[i], uniprot_dict)
+        sequence=peptide.uniprot2sequence()
+        if encoding_bools_dict['windowbasedf'] or encoding_bools_dict['autocorrelationf']:
+            all_residue_descr=peptide.extract_residue_descriptors(sequence)
+        if encoding_bools_dict['ligandf']:
+            ligand_features=ligand.rdkit_descriptors()
+            ligand_list.append(ligand_features)
+        if encoding_bools_dict['topologicalf']:
+            ligand_topological=ligand.topological_fingerprints()
+            topological_list.append(ligand_topological)
+        if encoding_bools_dict['morganf']:
+            ligand_morgan=ligand.morgan_fingerprint()
+            morgan_list.append(ligand_morgan)
+        if encoding_bools_dict['macckeysf']:
+            ligand_macckeys=ligand.macckeys()
+            macckeys_list.append(ligand_macckeys)
+        if encoding_bools_dict['peptidef']:
+            peptide_features_list=peptide.extract_global_descriptors(sequence)
+            peptide_features=np.array(peptide_features_list)
+            peptide_list.append(peptide_features)
+        if encoding_bools_dict['windowbasedf']:
+            peptide_windowbased_list=peptide.compute_window_based_features(sequence,all_residue_descr)
+            peptide_windowbased=np.array(peptide_windowbased_list)
+            windowbased_list.append(peptide_windowbased)
+        if encoding_bools_dict['autocorrelationf']:
+            peptide_autocorrelation_list=peptide.compute_autocorrelation_features(all_residue_descr)
+            peptide_autocorrelation=np.array(peptide_autocorrelation_list)
+            autocorrelation_list.append(peptide_autocorrelation)
+    
+    true_list = []          #contains as items all encodings that have been set to True in encoding_bools_dict
 
+    for encoding_name, encoding_bool in encoding_bools_dict.items():
+        if encoding_bool:
+            if encoding_name=='ligandf':
+                array=np.array(ligand_list)
+            if encoding_name=='topologicalf':
+                array=np.array(topological_list)
+            if encoding_name=='morganf':
+                array=np.array(morgan_list)
+            if encoding_name=='macckeysf':
+                array=np.array(macckeys_list)
+            if encoding_name=='peptidef':
+                array=np.array(peptide_list)
+            if encoding_name=='windowbasedf':
+                array=np.array(windowbased_list)
+            if encoding_name=='autocorrelationf':
+                array=np.array(autocorrelation_list)
+            true_list.append(array)
+    
+    X = np.concatenate(true_list, axis=1)
+
+    return X, affinity
+
+def extract_all_features(datafile, encoding_names):
+    """this function makes a dictionary with all the different possible datasets. 
+    Parameters:
+        Datafile: csv-file with a format of the trainingset and testset.
+        Encoding_names (list): list of all possible encodings
+    Returns:
+        Dictionary: a dictionary with as key the name of the encoding and as value an array shape n_samples, n_features.
+
+        Affinity (np.array): 1D array of shape (n_samples,) that contains the affinity per sample, as read from the datafile. If datafile does not 
+            contain affinity (in the case of unlabeled data), affinity contain 'unknown affinity' for each sample.
+        """
     SMILES,UNIProt_ID,affinity=data_to_SMILES_UNIProt_ID(datafile)
     uniprot_dict=extract_sequence("data/protein_info.csv")
     dictionary={}
@@ -440,60 +516,42 @@ def extract_all_features(datafile,ligandf=True,topologicalf=True,morganf=True,
         ligand=small_molecule(SMILES[i])
         peptide=protein(UNIProt_ID[i], uniprot_dict)
         sequence=peptide.uniprot2sequence()
-        all_residue_descr=peptide.extract_all_local_descriptors(sequence)
-        if ligandf==True:
-            ligand_features=ligand.rdkit_descriptor()
-            ligand_list.append(ligand_features)
-        if topologicalf==True:
-            ligand_topological=ligand.topological_fingerprints()
-            topological_list.append(ligand_topological)
-        if morganf==True:
-            ligand_morgan=ligand.morgan_fingerprint()
-            morgan_list.append(ligand_morgan)
-        if macckeysf==True:
-            ligand_macckeys=ligand.macckeys()
-            macckeys_list.append(ligand_macckeys)
-        if peptidef==True:
-            peptide_features_list=peptide.extract_global_descriptors(sequence)
-            peptide_features=np.array(peptide_features_list)
-            peptide_list.append(peptide_features)
-        if windowbasedf==True:
-            peptide_windowbased_list=peptide.compute_window_based_features(sequence,all_residue_descr)
-            peptide_windowbased=np.array(peptide_windowbased_list)
-            windowbased_list.append(peptide_windowbased)
-        if autocorrelationf==True:
-            peptide_autocorrelation_list=peptide.compute_autocorrelation_features(all_residue_descr)
-            peptide_autocorrelation=np.array(peptide_autocorrelation_list)
-            autocorrelation_list.append(peptide_autocorrelation)
+        all_residue_descr=peptide.extract_residue_descriptors(sequence)
 
-    if ligandf==True:
-        ligand_array=np.array(ligand_list)
-        n_samples, lf_features=ligand_array.shape
-        dictionary['ligandf']=ligand_array,lf_features
-    if topologicalf==True:
-        topological_array=np.array(topological_list)
-        n_samples, tf_features=topological_array.shape
-        dictionary['topologicalf']=topological_array,tf_features
-    if morganf==True:
-        morgan_array=np.array(morgan_list)
-        n_samples,mo_features=morgan_array.shape
-        dictionary['morganf']=morgan_array,mo_features
-    if macckeysf==True:
-        macckeys_array=np.array(macckeys_list)
-        n_samples,ma_feautures=macckeys_array.shape
-        dictionary['macckeysf']=macckeys_array,ma_feautures
-    if peptidef==True:
-        peptide_array=np.array(peptide_list)
-        n_samples,pf_features=peptide_array.shape
-        dictionary['peptidef']=peptide_array,pf_features
-    if windowbasedf==True:
-        windowbased_array=np.array(windowbased_list)
-        n_samples,wb_features=windowbased_array.shape
-        dictionary['windowbasedf']=windowbased_array,wb_features
-    if autocorrelationf==True:
-        autocorrelation_array=np.array(autocorrelation_list)
-        n_samples,ac_features=autocorrelation_array.shape
-        dictionary['autocorrelationf']=autocorrelation_array,ac_features
+        ligand_features=ligand.rdkit_descriptors()
+        ligand_topological=ligand.topological_fingerprints()
+        ligand_morgan=ligand.morgan_fingerprint()
+        ligand_macckeys=ligand.macckeys()
+        peptide_features_list=peptide.extract_global_descriptors(sequence)
+        peptide_windowbased_list=peptide.compute_window_based_features(sequence,all_residue_descr)
+        peptide_autocorrelation_list=peptide.compute_autocorrelation_features(all_residue_descr)
+        
+        ligand_list.append(ligand_features)
+        topological_list.append(ligand_topological)
+        morgan_list.append(ligand_morgan)
+        macckeys_list.append(ligand_macckeys)
+        peptide_list.append(np.array(peptide_features_list))
+        windowbased_list.append(np.array(peptide_windowbased_list))
+        autocorrelation_list.append(np.array(peptide_autocorrelation_list))
+    
+    for encoding_name in encoding_names:
+        if encoding_name=='ligandf':
+            array=np.array(ligand_list)
+        if encoding_name=='topologicalf':
+            array=np.array(topological_list)
+        if encoding_name=='morganf':
+            array=np.array(morgan_list)
+        if encoding_name=='macckeysf':
+            array=np.array(macckeys_list)
+        if encoding_name=='peptidef':
+            array=np.array(peptide_list)
+        if encoding_name=='windowbasedf':
+            array=np.array(windowbased_list)
+        if encoding_name=='autocorrelationf':
+            array=np.array(autocorrelation_list)
+
+        n_features=array.shape[1]
+        dictionary[encoding_name]=array,n_features
     
     return dictionary,affinity
 
@@ -519,7 +577,7 @@ def slicing_features(large_feature_array, n_features_list, bool_list):
             start_index = cumulative_n_features[i]
             stop_index = start_index + n_features_list[i]
             array_to_be_added = large_feature_array[:,start_index:stop_index]
-            if sliced_features==None:                       
+            if sliced_features is None:                       
                 sliced_features = array_to_be_added         #it is impossible to concatenate something to an empty array
             else:
                 sliced_features = np.concatenate((sliced_features, array_to_be_added), axis=1)
@@ -554,7 +612,6 @@ def fit_PCA(X, n_components=None):
     return X_scores, variance_per_pc
 
 
-#Onderstaande 2 functies zijn voor ons eigen gebruik, voor als we gaan testen welke data source het beste is (Iris, vrijdagavond)
 def select_principal_components(X_pca_scores, variance_explained, goal_cumulative_variance):
     """from the input array X_pca_scores, creates a new array relevant_principle_components, which is a subset
     of the input array that includes only the relevant PCs to reach the goal_cumulative_variance. 
@@ -568,16 +625,22 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
     relevant_principal_components = X_pca_scores[:, :pc]
     return relevant_principal_components
 
-
-#Code voor Iris om te testen welke data source het beste is
-def data_sources_training(data_sources_dict,n_features_list,affinity, encoding_booleans):
-    splitted_data_dict={}
-    for current_data_source, current_X_train in data_sources_dict.items():
-        splitted_X=slicing_features(current_X_train,n_features_list,encoding_booleans)
-        splitted_data_dict[current_data_source]=splitted_X
-    
-    highest_cv_score,best_datasource=best_data_source(splitted_data_dict, affinity)
-    return highest_cv_score,best_datasource
+def data_sources_training(data_sources_dict,affinity):
+    """performs cross-validation on the different data sources in data_sources_dict. These can for example be functionalities 
+    like scaling and clipping outliers included or excluded."""
+    highest_cv_score = 0
+    for current_data_source, current_X_train in data_sources_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
+        estimator = RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=-2, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, cv=3, scoring='neg_mean_absolute_error').mean()
+        mean_cv_score = -neg_mean_cv_score
+        print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
+        if mean_cv_score > highest_cv_score:        
+            highest_cv_score = mean_cv_score
+            best_datasource = current_data_source          #keeps track of the best data source thus far
+    print(f'The best data source is {best_datasource} with score={highest_cv_score}')
+    return highest_cv_score, best_datasource
 
 def make_data_sources_dict(X_train_raw,PCA=True):
     """applies cleaning, scaling, and pca where relevant.
@@ -623,18 +686,7 @@ def make_data_sources_dict(X_train_raw,PCA=True):
 
 def best_data_source(data_sources_dict, y_train):
     """tries multiple data sources specified in data_sources_dict to determine the best one using cross-validation"""
-    highest_cv_score = 0
-    for current_data_source, current_X_train in data_sources_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        estimator = RandomForestRegressor(n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=-2, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
-        mean_cv_score = cross_val_score(estimator, current_X_train, y_train, cv=3).mean()
-        print(f'For the data source {current_data_source}, the mean cv score is {mean_cv_score}')
-        if mean_cv_score > highest_cv_score:        
-            highest_cv_score = mean_cv_score
-            best_datasource = current_data_source          #keeps track of the best data source thus far
-    print(f'The best data source is {best_datasource} with score={highest_cv_score}')
-    return highest_cv_score, best_datasource
+
 
 
 def kaggle_submission(X_test,model,filename):
@@ -664,7 +716,7 @@ def make_pca_plots(pca_scores):
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
 
-def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomized'):
+def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomized', scoring='neg_mean_absolute_error'):
     """Tunes the hyperparameters for the RF model using randomised search.
     Input:  
     X (np.array): array of size (n_samples * n_features)
@@ -677,46 +729,34 @@ def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomiz
     """
     model = RandomForestRegressor()
     if search_type=='grid':
-        estimator = GridSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold)
+        estimator = GridSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, verbose=3, scoring=scoring)
     elif search_type=='randomized':
-        estimator = RandomizedSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, n_iter=n_iter, verbose=2)
+        estimator = RandomizedSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, n_iter=n_iter, verbose=2, scoring=scoring)
     estimator.fit(X,y)
     best_estimator = estimator.best_estimator_
     best_params = estimator.best_params_
-    return best_params
+    best_score = estimator.best_score_
+    return best_params, best_score
 
 
 if tuning is True:
     starttime=time.time()
     print("started tuning")
-    data_dictionary,affinity=extract_all_features("data/train.csv")
-    lf_array,lf_features=data_dictionary['ligandf']
-    tf_array,tf_features=data_dictionary['topologicalf']
-    mo_array,mo_features=data_dictionary['morganf']
-    ma_array,ma_features=data_dictionary['macckeysf']
-    pf_array,pf_features=data_dictionary['peptidef']
-    wb_array,wb_features=data_dictionary['windowbasedf']
-    ac_array,ac_features=data_dictionary['autocorrelationf']
-    all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
-    n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
-    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
-    encoding_bools = []         #Here, you can insert booleans corresponding to every encoding. This is in the order of the list in the previous line.
-    
-    X = slicing_features(all_features, n_features_list, encoding_bools)
-    y = affinity
-
-    print("data is prepared")
+    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
+                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    X,y=extract_true_features("data/train.csv", encoding_bools)
+    print(f'data array has been made, this took {(time.time()-starttime)/60} minutes')
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
     print("data is scaled")
-    n_estimators_grid = range(100,301,20)
-    max_depth_grid = range(3,16)
-    min_samples_split_grid = range(2,11)
-    min_samples_leaf_grid = range(1,6)
-    max_features_grid = ['sqrt','log2',None]
+    n_estimators_grid = [400]
+    max_depth_grid = [43,44,45,46,47,48]
+    min_samples_split_grid = [2]
+    min_samples_leaf_grid = [1]
+    max_features_grid = ['sqrt']
     param_options = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
                      'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
-    print(hyperparams_cv(X,y,param_options,n_iter=200,cv_fold=3))
+    print(hyperparams_cv(X_scaled,y,param_options,n_iter=120,cv_fold=5,search_type='grid'))
     total_time = time.time()-starttime
     print(f"this took {total_time} seconds, which is {total_time/60} minutes")
 
@@ -725,23 +765,25 @@ if run is True:
     starttime=time.time()
     print("started")
     bestscore=0
-
-    data_dictionary,affinity=extract_all_features("data/train.csv")
-    lf_array,lf_features=data_dictionary['ligandf']
-    tf_array,tf_features=data_dictionary['topologicalf']
-    mo_array,mo_features=data_dictionary['morganf']
-    ma_array,ma_features=data_dictionary['macckeysf']
-    pf_array,pf_features=data_dictionary['peptidef']
-    wb_array,wb_features=data_dictionary['windowbasedf']
-    ac_array,ac_features=data_dictionary['autocorrelationf']
+    order_of_encodings = ['ligandf', 'topologicalf', 'morganf', 'macckeysf', 'peptidef', 'windowbasedf', 'autocorrelationf']
+    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
+                      'peptidef': True, 'windowbasedf': True, 'autocorrelationf': True}
+    data_dictionary,affinity=extract_all_features("data/train.csv",encoding_names=list(encoding_bools.keys()))
+    lf_array,n_lf_features=data_dictionary['ligandf']
+    tf_array,n_tf_features=data_dictionary['topologicalf']
+    mo_array,n_mo_features=data_dictionary['morganf']
+    ma_array,n_ma_features=data_dictionary['macckeysf']
+    pf_array,n_pf_features=data_dictionary['peptidef']
+    wb_array,n_wb_features=data_dictionary['windowbasedf']
+    ac_array,n_ac_features=data_dictionary['autocorrelationf']
 
     all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
-    n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
-    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
+    n_features_list=[n_lf_features,n_tf_features,n_mo_features,n_ma_features,n_pf_features,n_wb_features,n_ac_features]
+
 
     data_sources_dict=make_data_sources_dict(all_features,PCA=False)
-    true_false_combinations = create_tf_combinations(len(n_features_list))
-    valid_tf_combinations = verify_tf_combinations(true_false_combinations)
+    true_false_combinations = create_tf_combinations(len(n_features_list), [])      #generates lists of True and False in all possible combinations with length of the number of encodings, here 7 (4 ligand + 3 protein)
+    valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
 
     for encoding_bools in valid_tf_combinations:
         included_encodings = []
@@ -750,6 +792,10 @@ if run is True:
                 included_encodings.append(order_of_encodings[i])
         print(f'This iterations uses the features from: {included_encodings}')
         score, best_datasource=data_sources_training(data_sources_dict,n_features_list,affinity, encoding_booleans=encoding_bools)
+        sliced_data_dict={}
+        for current_data_source, current_X_train in data_sources_dict.items():
+            sliced_X = slicing_features(current_X_train, n_features_list, encoding_bools)
+            sliced_data_dict[current_data_source] = sliced_X
         print(f'The score is {score}')                            
         if score>bestscore:
             bestscore = score
@@ -778,29 +824,11 @@ if run is True:
 
 if kaggle==True:
     starttime=time.time()
-    data_dictionary_train, y = extract_all_features("data/train.csv")
-    data_dictionary_test, unknown_affinity  = extract_all_features("data/test.csv")
-
-    for datadict in (data_dictionary_train, data_dictionary_test):
-        lf_array,lf_features=data_dictionary['ligandf']
-        tf_array,tf_features=data_dictionary['topologicalf']
-        mo_array,mo_features=data_dictionary['morganf']
-        ma_array,ma_features=data_dictionary['macckeysf']
-        pf_array,pf_features=data_dictionary['peptidef']
-        wb_array,wb_features=data_dictionary['windowbasedf']
-        ac_array,ac_features=data_dictionary['autocorrelationf']
-        if datadict == data_dictionary_train:
-            all_features_train=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
-        else:
-            all_features_test=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
-    
-    n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
-    order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
-    encoding_bools = []         #Here, you can insert booleans corresponding to every encoding. This is in the order of the list in the previous line.
-    
-    X = slicing_features(all_features, n_features_list, encoding_bools)
+    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
+                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    X,y=extract_true_features("data/train.csv", encoding_bools)
     print("trainingset is prepared")
-    X_test = slicing_features(all_features, n_features_list, encoding_bools)
+    X_test,unknown_affinity=extract_true_features("data/test.csv", encoding_bools)
     print("testset is prepared")
     scaler=set_scaling(X)
     X_scaled=data_scaling(scaler,X)
