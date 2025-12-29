@@ -1,6 +1,6 @@
 run=False
-kaggle=False
-tuning=True
+kaggle=True
+tuning=False
 
 import pandas as pd
 import numpy as np
@@ -782,6 +782,7 @@ if run is True:
 
 
     data_sources_dict=make_data_sources_dict(all_features,PCA=False)
+    
     true_false_combinations = create_tf_combinations(len(n_features_list), [])      #generates lists of True and False in all possible combinations with length of the number of encodings, here 7 (4 ligand + 3 protein)
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
 
@@ -830,14 +831,42 @@ if kaggle==True:
     print("trainingset is prepared")
     X_test,unknown_affinity=extract_true_features("data/test.csv", encoding_bools)
     print("testset is prepared")
-    scaler=set_scaling(X)
-    X_scaled=data_scaling(scaler,X)
-    print("trainingset is scaled")
-    X_test_scaled=data_scaling(scaler,X_test)
-    print("testset is scaled")
-    model=train_model(X_scaled,y, n_estimators=240,min_samples_split=5,min_samples_leaf=3,max_features=None,max_depth=15)
-    print("model is trained")
-    kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+    if scaling is True:
+        scaler=set_scaling(X)
+        X_scaled=data_scaling(scaler,X)
+        print("trainingset is scaled")
+        X_test_scaled=data_scaling(scaler,X_test)
+        print("testset is scaled")
+        model=train_model(X_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        print("model is trained")
+        kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+
+    if cleaning is True:
+        X_cleaned,clean=clipping_outliers_train(X)
+        X_test_cleaned=clipping_outliers_test(X_test,clean)
+        print("sets are cleaned")
+        model=train_model(X_cleaned,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        print("model is trained")
+        kaggle_submission(X_test_cleaned,model,"docs/Kaggle_submission.csv")
+
+    if cleaning is True and scaling is True:
+        scaler=set_scaling(X)
+        X_scaled=data_scaling(scaler,X)
+        print("trainingset is scaled")
+        X_test_scaled=data_scaling(scaler,X_test)
+        print("testset is scaled")
+        X_cleaned_scaled,clean=clipping_outliers_train(X_scaled)
+        X_test_cleaned_scaled=clipping_outliers_test(X_test_scaled,clean)
+        model=train_model(X_cleaned_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        print("model is trained")
+        kaggle_submission(X_test_cleaned_scaled,model,"docs/Kaggle_submission.csv")
+
     print("file is made with predictions")
     endtime=time.time()
     print("the model is trained en data is predicted")
