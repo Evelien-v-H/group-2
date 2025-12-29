@@ -782,7 +782,7 @@ if kaggle==True:
     data_dictionary_test, unknown_affinity  = extract_all_features("data/test.csv")
 
     order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
-    encoding_bools = [True,True,False,False,True,False,False] #Here, you can insert booleans corresponding to every encoding. This is in the order of the list in the previous line.
+    encoding_bools = [False,True,True,True,True,False,False] #Here, you can insert booleans corresponding to every encoding. This is in the order of the list in the previous line.
     scaling=False
     cleaning=True
 
@@ -812,7 +812,9 @@ if kaggle==True:
         print("trainingset is scaled")
         X_test_scaled=data_scaling(scaler,X_test)
         print("testset is scaled")
-        model=train_model(X_scaled,y, n_estimators=350,min_samples_split=2,min_samples_leaf=1,max_features='sqrt',max_depth=21)
+        model=train_model(X_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         print("model is trained")
         kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
 
@@ -820,7 +822,9 @@ if kaggle==True:
         X_cleaned,clean=clipping_outliers_train(X)
         X_test_cleaned=clipping_outliers_test(X_test,clean)
         print("sets are cleaned")
-        model=train_model(X_cleaned,y, n_estimators=350,min_samples_split=2,min_samples_leaf=1,max_features='sqrt',max_depth=21)
+        model=train_model(X_cleaned,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         print("model is trained")
         kaggle_submission(X_test_cleaned,model,"docs/Kaggle_submission.csv")
 
@@ -832,7 +836,9 @@ if kaggle==True:
         print("testset is scaled")
         X_cleaned_scaled,clean=clipping_outliers_train(X_scaled)
         X_test_cleaned_scaled=clipping_outliers_test(X_test_scaled,clean)
-        model=train_model(X_cleaned_scaled,y, n_estimators=350,min_samples_split=2,min_samples_leaf=1,max_features='sqrt',max_depth=21)
+        model=train_model(X_cleaned_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         print("model is trained")
         kaggle_submission(X_test_cleaned_scaled,model,"docs/Kaggle_submission.csv")
 
