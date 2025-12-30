@@ -339,7 +339,7 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-def clipping_outliers_train(matrix,percentile_low=5,percentile_high=95):
+def clipping_outliers_train(matrix,percentile_low=1,percentile_high=99):
     """This function changes outliers to the highest possible not outlier value, percentile_low, the smallest percentile,percentile_high, highest percentile both must be integers
     
     input: matrix (a colom is a feature)
@@ -860,7 +860,6 @@ if run is True:
     print(f"and is achieved with the following adjustments: {bestbools}")
     print(f"best dataprep: {bestdataprep}")
 
-
 if kaggle==True:
     starttime=time.time()
     encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
@@ -881,7 +880,7 @@ if kaggle==True:
         X_test_scaled=data_scaling(scaler,X_test)
         print("testset is scaled")
         model=train_model(X_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                min_weight_fraction_leaf=0.0, max_features='sqrt', max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         print("model is trained")
         kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
@@ -905,7 +904,7 @@ if kaggle==True:
         X_cleaned_scaled,clean=clipping_outliers_train(X_scaled)
         X_test_cleaned_scaled=clipping_outliers_test(X_test_scaled,clean)
         model=train_model(X_cleaned_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                min_weight_fraction_leaf=0.0, max_features='sqrt', max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         print("model is trained")
         kaggle_submission(X_test_cleaned_scaled,model,"docs/Kaggle_submission.csv")
