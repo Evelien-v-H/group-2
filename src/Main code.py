@@ -1,6 +1,8 @@
 run=False
 kaggle=False
-tuning=True
+
+tuning=False
+
 
 import pandas as pd
 import numpy as np
@@ -337,7 +339,7 @@ def check_matrix(X):
     print("Max waarde:", np.nanmax(X))
     print("Min waarde:", np.nanmin(X))
 
-def clipping_outliers_train(matrix,percentile_low=5,percentile_high=95):
+def clipping_outliers_train(matrix,percentile_low=1,percentile_high=99):
     """This function changes outliers to the highest possible not outlier value, percentile_low, the smallest percentile,percentile_high, highest percentile both must be integers
     
     input: matrix (a colom is a feature)
@@ -821,8 +823,6 @@ if run is True:
     print("datasource="+str(bestdatasource))
 
     
-
-
 if kaggle==True:
     starttime=time.time()
     encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
@@ -873,3 +873,4 @@ if kaggle==True:
     endtime=time.time()
     print("the model is trained en data is predicted")
     print("this took " + str(endtime-starttime) + " seconds")
+
