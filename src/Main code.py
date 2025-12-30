@@ -658,35 +658,38 @@ def data_prep_cv(data_prep_dict,affinity, n_estimators=100, max_depth=None, min_
     print(f'The best data source is {best_datasource} with score={highest_cv_score}')
     return highest_cv_score, best_datasource
 
-def make_data_prep_dict(X_train_raw,scaling=True,clipping=True,PCA=True):
+def make_data_prep_dict(X_train_raw,include_only_cleaning,include_scaling=True,include_clipping=True,include_PCA='clipping'):
     """applies different data preppings to X_train_raw, depending on what boolean parameters have been set to true.
     Parameters:
         X_train_raw (np.array): array of shape (n_samples, n_features).
-        scaling (boolean): determines whether scaling (min-max) will be applied.
-        clipping (boolean): determines whether the outliers will be clipped (values beyond 1st and 99th percentile 
+        include_only_cleaning (boolean): determines whether only cleaned X_train_raw will be included
+        include_scaling (boolean): determines whether scaling (min-max) will be applied.
+        include_clipping (boolean): determines whether the outliers will be clipped (values beyond 1st and 99th percentile 
             replaced with values at 1st and 99th percentile). If both scaling and clipping are True, clipping will be 
             applied before scaling.
-        PCA (boolean): determines whether PCA will be applied. If True, three extra arrays will be added to data_prep_dict, that 
-            respectively explain 66%, 80%, and 95% of variance. When PCA is True, scaling will always be applied. Value of 
-            parameter clipping will determine if outliers will be clipped before applying scaling and PCA.
+        include_PCA (False, 'no_clipping', 'clipping'): determines whether PCA will be applied. If False, will be excluded.
+            If 'no_clipping', will be included without clipping. If 'clipping', will be included with clipping. If included, 
+            three additional data prep options will be included in the data_prep_dict, that respectively explain 
+            66%, 80%, and 95% of variance. When PCA is True, scaling will always be applied.
     Returns:
         data_prep_dict (dict): dictionary with as keys the type of data prepping and as values the respective X_train array.
     """
     
     X_train, mean_value_coloms, irrelevant_colums=data_cleaning_train(X_train_raw)
-    if clipping:
+    if include_only_cleaning: data_prep_dict['X_only_cleaned'] = X_train
+    if include_clipping:
         X_clipped, percentile_list = clipping_outliers_train(X_train)
-        if not scaling: data_prep_dict['X_clipped'] = X_clipped
-    elif scaling:
+        if not include_scaling: data_prep_dict['X_clipped'] = X_clipped
+    elif include_scaling:
         scaler = set_scaling(X_train)
         X_scaled = data_scaling(scaler, X_train)
         data_prep_dict['X_scaled'] = X_scaled
-    if clipping and scaling:
+    if include_clipping and include_scaling:
         X_clipped
         scaler = set_scaling(X_clipped)
         X_clipped_scaled = data_scaling(scaler, X_clipped)
         data_prep_dict['X_clipped_scaled'] = X_clipped_scaled
-    if PCA and not clipping:
+    if include_PCA=='no_clipping':
         X_train_pc_scores, variance_per_pc = fit_PCA(X_scaled)
         X_train_pca66 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.66)
         X_train_pca80 = select_principal_components(X_train_pc_scores, variance_per_pc, 0.80)
@@ -694,7 +697,7 @@ def make_data_prep_dict(X_train_raw,scaling=True,clipping=True,PCA=True):
         data_prep_dict['Scaled+pca66']=X_train_pca66
         data_prep_dict['Scaled+pca80']=X_train_pca80
         data_prep_dict['Scaled+pca95']=X_train_pca95
-    if PCA and clipping:
+    elif include_PCA=='clipping':
         X_train_clipped_pc_scores, variance_per_pc_cleaned = fit_PCA(X_clipped_scaled)
         X_train_clipped_pca66 = select_principal_components(X_train_clipped_pc_scores, variance_per_pc_cleaned, 0.66)
         X_train_clipped_pca80 = select_principal_components(X_train_clipped_pc_scores, variance_per_pc_cleaned, 0.80)
@@ -818,7 +821,8 @@ if run is True:
     n_features_list=[n_lf_features,n_tf_features,n_mo_features,n_ma_features,n_pf_features,n_wb_features,n_ac_features]
 
 
-    data_prep_dict=make_data_prep_dict(all_features,scaling=False, clipping=True, clipping_and_scaling=False, PCA=False)
+    data_prep_dict=make_data_prep_dict(all_features, include_only_cleaning=True, include_scaling=False, 
+                                       include_clipping=True, include_PCA=False)
     
     true_false_combinations = create_tf_combinations(len(n_features_list), [])      #generates lists of True and False in all possible combinations with length of the number of encodings, here 7 (4 ligand + 3 protein)
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
