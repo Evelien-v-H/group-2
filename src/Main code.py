@@ -288,7 +288,7 @@ def data_cleaning_train(data):
             if i not in irrelevant_colums:
                 if is_number(data[k,i]) is True:
                     if float(data[k,i])>=np.finfo(np.float32).max:
-                        raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manual")
+                        raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manually")
                     else:
                         data[k,i]=float(data[k,i])
             
@@ -317,7 +317,7 @@ def data_cleaning_test(data,mean_value_coloms, irrelevant_colums):
         for j in range(data.shape[0]):
             if is_number(data[j,i]) is True:
                 if float(data[j,i])>=np.finfo(np.float32).max:
-                    raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manual")
+                    raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manually")
                 else:
                     data[j,i]=float(data[j,i])
             else:
@@ -864,50 +864,60 @@ if kaggle==True:
     starttime=time.time()
     encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
-    scaling=False
-    cleaning=True
+    scaling=False           #Determines whether scaling will be applied
+    clipping=True           #Determines whether outliers will be clipped
+    n_estimators=100        #Vul hier je hyperparameters in
+    max_depth=None
+    min_samples_split=2
+    min_samples_leaf=1
+    max_features=None
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
     smiles_test,uniprot_ids_test,unknown_affinity=data_to_SMILES_UNIProt_ID("data/test.csv")
-    X_train = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
+    X_train = data_cleaning_train(extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train))
     print("trainingset is prepared")
-    X_test = extract_true_features(encoding_bools, uniprot_dict, smiles_test, uniprot_ids_test)
+    X_test = data_cleaning_test(extract_true_features(encoding_bools, uniprot_dict, smiles_test, uniprot_ids_test))
     print("testset is prepared")
-    if scaling is True:
+    if scaling and not clipping:
         scaler=set_scaling(X_train)
         X_scaled=data_scaling(scaler,X_train)
         print("trainingset is scaled")
-        X_test_scaled=data_scaling(scaler,X_test)
+        X_test_clipped_scaled=data_scaling(scaler,X_test)
         print("testset is scaled")
-        model=train_model(X_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features='sqrt', max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        model=train_model(X_scaled,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
-        kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+        kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
 
-    if cleaning is True:
-        X_train_cleaned,clean=clipping_outliers_train(X_train)
-        X_validation_cleaned=clipping_outliers_test(X_test,clean)
+    elif clipping and not scaling:
+        X_train_cleaned,clip=clipping_outliers_train(X_train)
+        X_validation_cleaned=clipping_outliers_test(X_test,clip)
         print("sets are cleaned")
-        model=train_model(X_train_cleaned,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        model=train_model(X_scaled,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
         kaggle_submission(X_validation_cleaned,model,"docs/Kaggle_submission.csv")
 
-    if cleaning is True and scaling is True:
-        scaler=set_scaling(X_train)
-        X_scaled=data_scaling(scaler,X_train)
+    elif clipping and scaling:
+        X_clipped,clip=clipping_outliers_train(X_train)
+        print("trainingset is clipped")
+        X_test_clipped=clipping_outliers_test(X_test,clip)  
+        print("testset is clipped")      
+        scaler=set_scaling(X_clipped)
+        X_clipped_scaled=data_scaling(scaler,X_clipped)
         print("trainingset is scaled")
-        X_test_scaled=data_scaling(scaler,X_test)
+        X_test_clipped_scaled=data_scaling(scaler,X_test_clipped)
         print("testset is scaled")
-        X_cleaned_scaled,clean=clipping_outliers_train(X_scaled)
-        X_test_cleaned_scaled=clipping_outliers_test(X_test_scaled,clean)
-        model=train_model(X_cleaned_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features='sqrt', max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        model=train_model(X_clipped_scaled,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
-        kaggle_submission(X_test_cleaned_scaled,model,"docs/Kaggle_submission.csv")
+        kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
+
+    if not clipping and not scaling:
+        model=train_model(X_train,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                    min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
+        print("model is trained")
+        kaggle_submission(X_test,model,"docs/Kaggle_submission.csv") 
 
     print("file is made with predictions")
     endtime=time.time()
@@ -932,8 +942,8 @@ if errors is True:
     min_samples_split = 2
     min_samples_leaf = 1
     max_features = None
-    X_train_cleaned,clean=clipping_outliers_train(X_train)
-    X_validation_cleaned=clipping_outliers_test(X_validation,clean)
+    X_train_cleaned,clip=clipping_outliers_train(X_train)
+    X_validation_cleaned=clipping_outliers_test(X_validation,clip)
     print('data has been cleaned')
     rf_model = train_model(X_train, y_train_true, n_estimators=n_estimators, max_depth=max_depth, 
                         min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features)
