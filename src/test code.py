@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib as plt
 def is_number(val):
     try:
         float(val)
@@ -60,3 +61,46 @@ matrix=np.vstack((matrix,array3))
 for i in range(3):
     print(matrix[i:i+1,:])
     print('/n')
+
+    #Voor het overzichtelijk maken van de data
+def boxplot_everything(matrix):
+    """Making a boxplot of every kolom
+    
+    input: matrix, preferably scaled
+    
+    output: nothing"""
+    #Ik kan geen labels toevoegen want weet niet wat alles is en hoe alles is opgebouwd, dus deze functie schiet niet zoveel op, 
+    # maar is ook deels voor overzicht bedoeld
+    plt.boxplot(matrix)
+    plt.show()
+
+print('a')
+data_dictionary,affinity=extract_all_features("data/train.csv")
+print('b')
+plt.hist(affinity)
+plt.show()
+print('*')
+lf_array,lf_features=data_dictionary['ligandf']
+tf_array,tf_features=data_dictionary['topologicalf']
+mo_array,mo_features=data_dictionary['morganf']
+ma_array,ma_features=data_dictionary['macckeysf']
+pf_array,pf_features=data_dictionary['peptidef']
+wb_array,wb_features=data_dictionary['windowbasedf']
+ac_array,ac_features=data_dictionary['autocorrelationf']
+print('c')
+all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+print('d')
+n_features_list=[lf_features,tf_features,mo_features,ma_features,pf_features,wb_features,ac_features]
+order_of_encodings = ['ligandf', 'topological', 'morgan', 'macckeys', 'peptidef', 'windowbased', 'autocorrelation']
+
+encoding_bools=[True,True,True,True,True,True,True]
+X = slicing_features(all_features, n_features_list, encoding_bools)
+y = affinity
+print('e')
+X_clipped,list=clipping_outliers_train(X)
+scaler=set_scaling(X_clipped)
+X_scaled=data_scaling(scaler,X_clipped)
+print('f')
+boxplot_everything(X_scaled)
+print('g')
+
