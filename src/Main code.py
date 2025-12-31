@@ -874,9 +874,9 @@ if kaggle==True:
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
     smiles_test,uniprot_ids_test,unknown_affinity=data_to_SMILES_UNIProt_ID("data/test.csv")
-    X_train = data_cleaning_train(extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train))
+    X_train,mean_value_list, irrelevant_feature_list = data_cleaning_train(extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train))
     print("trainingset is prepared")
-    X_test = data_cleaning_test(extract_true_features(encoding_bools, uniprot_dict, smiles_test, uniprot_ids_test))
+    X_test = data_cleaning_test(extract_true_features(encoding_bools, uniprot_dict, smiles_test, uniprot_ids_test),mean_value_list, irrelevant_feature_list)
     print("testset is prepared")
     if scaling and not clipping:
         scaler=set_scaling(X_train)
