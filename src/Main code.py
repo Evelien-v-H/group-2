@@ -1,7 +1,7 @@
 run=False
-kaggle=False
+kaggle=True
 tuning=False
-errors=True
+errors=False
 
 import pandas as pd
 import numpy as np
@@ -862,11 +862,11 @@ if run is True:
 
 if kaggle==True:
     starttime=time.time()
-    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
+    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     scaling=False           #Determines whether scaling will be applied
     clipping=True           #Determines whether outliers will be clipped
-    n_estimators=100        #Vul hier je hyperparameters in
+    n_estimators=450        #Vul hier je hyperparameters in
     max_depth=None
     min_samples_split=2
     min_samples_leaf=1
