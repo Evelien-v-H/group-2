@@ -582,24 +582,21 @@ def slicing_features(large_feature_array, n_features_list, bool_list):
         bool_list (list): contains the booleans corresponding to each feature, in the same order.
     
     Returns:
-        sliced_features (np.array): np.array of shape (n_samples, n_features) that consists of all features of which the boolean
+        sliced_features_array (np.array): np.array of shape (n_samples, n_features) that consists of all features of which the boolean
             input parameter was set to True.
     
     """                               #keeps track of the encodings included in the output
     cumulative_n_features = np.cumsum(n_features_list)
-    sliced_features=None
+    sliced_features=[]
 
     for i in range(len(bool_list)):
         if bool_list[i]:
-            start_index = cumulative_n_features[i]
-            stop_index = start_index + n_features_list[i]
+            stop_index = cumulative_n_features[i]
+            start_index = cumulative_n_features[i] - n_features_list[i]
             array_to_be_added = large_feature_array[:,start_index:stop_index]
-            if sliced_features is None:                       
-                sliced_features = array_to_be_added         #it is impossible to concatenate something to an empty array
-            else:
-                sliced_features = np.concatenate((sliced_features, array_to_be_added), axis=1)
-
-    return sliced_features
+            sliced_features.append(array_to_be_added)
+    sliced_features_array = np.concatenate(sliced_features, axis=1)
+    return sliced_features_array
 
 def create_tf_combinations(remaining, current):
     """returns list of lists of all possible combinations of True and False. Remaining (int) indicates the length of each list of booleans. 
@@ -834,20 +831,21 @@ if run is True:
     for data_prep in list(data_prep_dict.keys()):
         data_prep_scores[data_prep]=[]
 
-    for encoding_bools in valid_tf_combinations:
-        included_encodings = []                         #keeps track of the encodings included in this iteration
+    for encoding_bools in valid_tf_combinations:        #encoding_bools is a list of True and False
+        included_encodings = []                         #keeps track of the encodings included in this iteration, only needed for printing this information
         for i in range(len(encoding_bools)):
             if encoding_bools[i]:
                 included_encodings.append(order_of_encodings[i])
         print(f'Encodings: {included_encodings}')
-        score, best_dataprep, data_prep_scores=data_prep_cv(data_prep_dict, affinity, data_prep_scores, n_estimators, max_depth, min_samples_split,
-                                                            min_samples_leaf, max_features)
-        sliced_data_dict={}
-        for current_data_source, current_X_train in data_prep_dict.items():
+        sliced_data_dict={}                             #will be identical to data_prep_dict but sliced to include only the encodings of this iteration
+        for current_data_prep, current_X_train in data_prep_dict.items():
             sliced_X = slicing_features(current_X_train, n_features_list, encoding_bools)
-            sliced_data_dict[current_data_source] = sliced_X
+            sliced_data_dict[current_data_prep] = sliced_X
+
+        score, best_dataprep, data_prep_scores=data_prep_cv(sliced_data_dict, affinity, data_prep_scores, n_estimators, max_depth, 
+                                                            min_samples_split, min_samples_leaf, max_features)
         print(f'The MAE is {score}')                            
-        if score>bestscore:
+        if score < bestscore:
             bestscore = score
             bestbools = encoding_bools
             bestdataprep = best_dataprep
@@ -920,7 +918,7 @@ if kaggle==True:
     print("this took " + str(endtime-starttime) + " seconds")
 
 if errors is True:
-    print("started")
+    print("started errors")
     starttime=time.time()
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
@@ -944,3 +942,38 @@ if errors is True:
                      encoding_bools=encoding_bools, rf_model=rf_model, n_estimators=n_estimators,
                       max_depth=max_depth, min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split, max_features=max_features)
     print(f"total time: {(time.time()-starttime)/60}")
+
+
+if many_errors is True:
+    n_estimators = 400
+    max_depth = None
+    min_samples_split = 2
+    min_samples_leaf = 1
+    max_features = None
+    options_to_try = [[False, True, True, False, True, True, True], [True, True, False, False, False, True, False],[False, True, False, True, True, False, True], 
+                    [True, True, True, False, True, False, False], [True, True, False, True, False, True, False], [True, True, False, True, True, False, False],
+                    [True, True, False, False, True, True, True], [False, True, False, True, True, True, False],[True,False,True,False,True,True,False], 
+                    [False,True,True,False,False,False,True],[True,True,True,False,True,True,True],[False,True,False,False,False,True,False],
+                    [True,True,True,False,True,False,True],[False,False,True,False,True,False,False],[True,True,True,True,False,True,False]]
+    encoding_bools={'ligandf': None, 'topologicalf': None, 'morganf': None, 'macckeysf': None, 'peptidef': None, 'windowbasedf': None, 'autocorrelationf': None}
+    print("started many_errors")
+    starttime=time.time()
+    uniprot_dict=extract_sequence("data/protein_info.csv")  
+    data_dictionary,affinity=extract_all_features("data/train.csv",encoding_names=list(encoding_bools.keys()))
+    lf_array,n_lf_features=data_dictionary['ligandf']
+    tf_array,n_tf_features=data_dictionary['topologicalf']
+    mo_array,n_mo_features=data_dictionary['morganf']
+    ma_array,n_ma_features=data_dictionary['macckeysf']
+    pf_array,n_pf_features=data_dictionary['peptidef']
+    wb_array,n_wb_features=data_dictionary['windowbasedf']
+    ac_array,n_ac_features=data_dictionary['autocorrelationf']
+
+    all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+    n_features_list=[n_lf_features,n_tf_features,n_mo_features,n_ma_features,n_pf_features,n_wb_features,n_ac_features]
+    print(f"large array has been made, time passed: {(time.time() - starttime)/60} minutes")
+    for encoding_bools in valid_tf_combinations:
+        included_encodings = []                         #keeps track of the encodings included in this iteration
+        for i in range(len(encoding_bools)):
+            if encoding_bools[i]:
+                included_encodings.append(order_of_encodings[i])
+        print(f'Encodings: {included_encodings}')
