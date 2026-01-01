@@ -642,21 +642,24 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
     relevant_principal_components = X_pca_scores[:, :pc]
     return relevant_principal_components
 
-def data_prep_cv(data_prep_dict,affinity, n_estimators=100, max_depth=None, min_samples_split=2, min_samples_leaf=1, max_features=None):
+def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, max_depth=None, 
+                 min_samples_split=2, min_samples_leaf=1, max_features=None):
     """performs cross-validation on the different data sources in data_prep_dict. These can for example be functionalities 
     like scaling and clipping outliers included or excluded."""
     highest_cv_score = 0
-    for current_data_source, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
-                max_features=max_features, max_leaf_nodes=None, n_jobs=-2, verbose=0, max_samples=None, monotonic_cst=None)
-        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, cv=5, scoring='neg_mean_absolute_error').mean()
+    for current_data_prep, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
+        score_list_current_prep = data_prep_scores[current_data_prep]           #a list of the scores of this data prepping
+        estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2, verbose=0)
+        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-2, cv=5, scoring='neg_mean_absolute_error').mean()
         mean_cv_score = -neg_mean_cv_score
-        print(f'For the data prep {current_data_source}, the mean cv score is {mean_cv_score}')
+        print(f'For {current_data_prep}, the mae is {mean_cv_score}')
+        score_list_current_prep.append(mean_cv_score)
         if mean_cv_score > highest_cv_score:        
             highest_cv_score = mean_cv_score
-            best_datasource = current_data_source          #keeps track of the best data prep thus far
-    print(f'The best data source is {best_datasource} with score={highest_cv_score}')
-    return highest_cv_score, best_datasource
+            best_dataprep = current_data_prep          #keeps track of the best data prep thus far
+        data_prep_scores[current_data_prep] = score_list_current_prep
+    return highest_cv_score, best_dataprep, data_prep_scores
 
 def make_data_prep_dict(X_train_raw,include_only_cleaning,include_scaling=True,include_clipping=True,include_PCA='clipping'):
     """applies different data preppings to X_train_raw, depending on what boolean parameters have been set to true.
@@ -674,7 +677,7 @@ def make_data_prep_dict(X_train_raw,include_only_cleaning,include_scaling=True,i
     Returns:
         data_prep_dict (dict): dictionary with as keys the type of data prepping and as values the respective X_train array.
     """
-    
+    data_prep_dict={}
     X_train, mean_value_coloms, irrelevant_colums=data_cleaning_train(X_train_raw)
     if include_only_cleaning: data_prep_dict['X_only_cleaned'] = X_train
     if include_clipping:
@@ -800,11 +803,11 @@ if run is True:
     print("started")
     bestscore=0
     order_of_encodings = ['ligandf', 'topologicalf', 'morganf', 'macckeysf', 'peptidef', 'windowbasedf', 'autocorrelationf']
-    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
-                      'peptidef': True, 'windowbasedf': True, 'autocorrelationf': True}
+    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
+                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     max_features=None
     max_depth=None
-    n_estimators=450
+    n_estimators=100
     min_samples_leaf=1
     min_samples_split=2
 
@@ -819,46 +822,48 @@ if run is True:
 
     all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
     n_features_list=[n_lf_features,n_tf_features,n_mo_features,n_ma_features,n_pf_features,n_wb_features,n_ac_features]
-
+    print(f"large array has been made, time passed: {(time.time() - starttime)/60} minutes")
 
     data_prep_dict=make_data_prep_dict(all_features, include_only_cleaning=True, include_scaling=False, 
-                                       include_clipping=True, include_PCA=False)
+                                       include_clipping=True, include_PCA=False)                    #specify here what data preps you want included in the comparison
     
     true_false_combinations = create_tf_combinations(len(n_features_list), [])      #generates lists of True and False in all possible combinations with length of the number of encodings, here 7 (4 ligand + 3 protein)
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
+
+    data_prep_scores = {}
+    for data_prep in list(data_prep_dict.keys()):
+        data_prep_scores[data_prep]=[]
 
     for encoding_bools in valid_tf_combinations:
         included_encodings = []                         #keeps track of the encodings included in this iteration
         for i in range(len(encoding_bools)):
             if encoding_bools[i]:
                 included_encodings.append(order_of_encodings[i])
-        print(f'This iterations uses the features from: {included_encodings}')
-        score, best_dataprep=data_prep_cv(data_prep_dict,affinity, n_estimators, max_depth, min_samples_split,
-                                          min_samples_leaf, max_features)
+        print(f'Encodings: {included_encodings}')
+        score, best_dataprep, data_prep_scores=data_prep_cv(data_prep_dict, affinity, data_prep_scores, n_estimators, max_depth, min_samples_split,
+                                                            min_samples_leaf, max_features)
         sliced_data_dict={}
         for current_data_source, current_X_train in data_prep_dict.items():
             sliced_X = slicing_features(current_X_train, n_features_list, encoding_bools)
             sliced_data_dict[current_data_source] = sliced_X
-        print(f'The score is {score}')                            
+        print(f'The MAE is {score}')                            
         if score>bestscore:
             bestscore = score
             bestbools = encoding_bools
-            bestligandf = bestbools[0]
-            besttopological = bestbools[1]
-            bestmorgan = bestbools[2]
-            bestmacckeys = bestbools[3]
-            bestpeptidef = bestbools[4]
-            bestwindowbased = bestbools[5]
-            bestautocorrelation = bestbools[6]
             bestdataprep = best_dataprep
-
         print('')
+   
+    prep_averages={}
+    for data_prep, scores in data_prep_scores.items():
+        prep_averages[data_prep] = np.mean(scores)
 
     print("training took "+str((time.time()-starttime)/3600)+" hours")
     print("")
-    print(f"best result is: {bestscore}")
+    print(f"best MAE is: {bestscore}")
     print(f"and is achieved with the following adjustments: {bestbools}")
     print(f"best dataprep: {bestdataprep}")
+    print("")
+    print(f"the data prep score averages are: {prep_averages}")
 
 if kaggle==True:
     starttime=time.time()
@@ -886,14 +891,14 @@ if kaggle==True:
         kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
 
     if cleaning is True:
-        X_train_cleaned,clean=clipping_outliers_train(X_train)
-        X_validation_cleaned=clipping_outliers_test(X_test,clean)
+        X_train,clean=clipping_outliers_train(X_train)
+        X_validation=clipping_outliers_test(X_test,clean)
         print("sets are cleaned")
-        model=train_model(X_train_cleaned,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+        model=train_model(X_train,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         print("model is trained")
-        kaggle_submission(X_validation_cleaned,model,"docs/Kaggle_submission.csv")
+        kaggle_submission(X_validation,model,"docs/Kaggle_submission.csv")
 
     if cleaning is True and scaling is True:
         scaler=set_scaling(X_train)
@@ -919,26 +924,23 @@ if errors is True:
     starttime=time.time()
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
-    encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
-                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
+                      'peptidef': True, 'windowbasedf': True, 'autocorrelationf': True}
     X = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
     print("data array has been made")
     training_set, validation_set = train_validation_split(X,y,0.8)
     X_train, y_train_true = training_set
     X_validation, y_validation_true = validation_set
-    print(f"data has been splitted into two sets, of size {np.shape(X_train)} and {np.shape(X_validation)}")
-    n_estimators = 450
+    print(f"data has been splitted into two sets")
+    n_estimators = 400
     max_depth = None
     min_samples_split = 2
     min_samples_leaf = 1
     max_features = None
-    X_train_cleaned,clean=clipping_outliers_train(X_train)
-    X_validation_cleaned=clipping_outliers_test(X_validation,clean)
-    print('data has been cleaned')
     rf_model = train_model(X_train, y_train_true, n_estimators=n_estimators, max_depth=max_depth, 
                         min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features)
     print(f"model has been trained, time passed: {(time.time()-starttime)/60}")
-    calculate_errors(X_train=X_train_cleaned, y_train_true=y_train_true, X_validation=X_validation_cleaned, y_validation_true=y_validation_true,
+    calculate_errors(X_train=X_train, y_train_true=y_train_true, X_validation=X_validation, y_validation_true=y_validation_true,
                      encoding_bools=encoding_bools, rf_model=rf_model, n_estimators=n_estimators,
                       max_depth=max_depth, min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split, max_features=max_features)
     print(f"total time: {(time.time()-starttime)/60}")
