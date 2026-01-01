@@ -1,7 +1,8 @@
-run=False
-kaggle=True
+run=True
+kaggle=False
 tuning=False
 errors=False
+many_errors=False
 
 import pandas as pd
 import numpy as np
@@ -582,24 +583,21 @@ def slicing_features(large_feature_array, n_features_list, bool_list):
         bool_list (list): contains the booleans corresponding to each feature, in the same order.
     
     Returns:
-        sliced_features (np.array): np.array of shape (n_samples, n_features) that consists of all features of which the boolean
+        sliced_features_array (np.array): np.array of shape (n_samples, n_features) that consists of all features of which the boolean
             input parameter was set to True.
     
     """                               #keeps track of the encodings included in the output
     cumulative_n_features = np.cumsum(n_features_list)
-    sliced_features=None
+    sliced_features=[]
 
     for i in range(len(bool_list)):
         if bool_list[i]:
-            start_index = cumulative_n_features[i]
-            stop_index = start_index + n_features_list[i]
+            stop_index = cumulative_n_features[i]
+            start_index = cumulative_n_features[i] - n_features_list[i]
             array_to_be_added = large_feature_array[:,start_index:stop_index]
-            if sliced_features is None:                       
-                sliced_features = array_to_be_added         #it is impossible to concatenate something to an empty array
-            else:
-                sliced_features = np.concatenate((sliced_features, array_to_be_added), axis=1)
-
-    return sliced_features
+            sliced_features.append(array_to_be_added)
+    sliced_features_array = np.concatenate(sliced_features, axis=1)
+    return sliced_features_array
 
 def create_tf_combinations(remaining, current):
     """returns list of lists of all possible combinations of True and False. Remaining (int) indicates the length of each list of booleans. 
@@ -642,21 +640,23 @@ def select_principal_components(X_pca_scores, variance_explained, goal_cumulativ
     relevant_principal_components = X_pca_scores[:, :pc]
     return relevant_principal_components
 
-def data_prep_cv(data_prep_dict,affinity, n_estimators=100, max_depth=None, min_samples_split=2, min_samples_leaf=1, max_features=None):
+def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, max_depth=None, 
+                 min_samples_split=2, min_samples_leaf=1, max_features=None):
     """performs cross-validation on the different data sources in data_prep_dict. These can for example be functionalities 
     like scaling and clipping outliers included or excluded."""
-    highest_cv_score = 0
-    for current_data_source, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
-                max_features=max_features, max_leaf_nodes=None, n_jobs=-2, verbose=0, max_samples=None, monotonic_cst=None)
-        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, cv=5, scoring='neg_mean_absolute_error').mean()
+    best_cv_score = 0
+    for current_prep_name, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
+        score_list_current_prep = data_prep_scores[current_prep_name]           #a list of the scores of this data prepping
+        estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2, verbose=0)
+        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-2, cv=5, scoring='neg_mean_absolute_error').mean()
         mean_cv_score = -neg_mean_cv_score
-        print(f'For the data prep {current_data_source}, the mean cv score is {mean_cv_score}')
-        if mean_cv_score > highest_cv_score:        
-            highest_cv_score = mean_cv_score
-            best_datasource = current_data_source          #keeps track of the best data prep thus far
-    print(f'The best data source is {best_datasource} with score={highest_cv_score}')
-    return highest_cv_score, best_datasource
+        score_list_current_prep.append(mean_cv_score)
+        if mean_cv_score < best_cv_score:        
+            best_cv_score = mean_cv_score
+            best_dataprep = current_prep_name          #keeps track of the best data prep thus far
+        data_prep_scores[current_prep_name] = score_list_current_prep
+    return best_cv_score, best_dataprep, data_prep_scores
 
 def make_data_prep_dict(X_train_raw,include_only_cleaning,include_scaling=True,include_clipping=True,include_PCA='clipping'):
     """applies different data preppings to X_train_raw, depending on what boolean parameters have been set to true.
@@ -674,7 +674,7 @@ def make_data_prep_dict(X_train_raw,include_only_cleaning,include_scaling=True,i
     Returns:
         data_prep_dict (dict): dictionary with as keys the type of data prepping and as values the respective X_train array.
     """
-    
+    data_prep_dict={}
     X_train, mean_value_coloms, irrelevant_colums=data_cleaning_train(X_train_raw)
     if include_only_cleaning: data_prep_dict['X_only_cleaned'] = X_train
     if include_clipping:
@@ -800,11 +800,11 @@ if run is True:
     print("started")
     bestscore=0
     order_of_encodings = ['ligandf', 'topologicalf', 'morganf', 'macckeysf', 'peptidef', 'windowbasedf', 'autocorrelationf']
-    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
-                      'peptidef': True, 'windowbasedf': True, 'autocorrelationf': True}
+    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
+                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     max_features=None
     max_depth=None
-    n_estimators=450
+    n_estimators=100
     min_samples_leaf=1
     min_samples_split=2
 
@@ -819,46 +819,48 @@ if run is True:
 
     all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
     n_features_list=[n_lf_features,n_tf_features,n_mo_features,n_ma_features,n_pf_features,n_wb_features,n_ac_features]
-
+    print(f"large array has been made, time passed: {(time.time() - starttime)/60} minutes")
 
     data_prep_dict=make_data_prep_dict(all_features, include_only_cleaning=True, include_scaling=False, 
-                                       include_clipping=True, include_PCA=False)
+                                       include_clipping=True, include_PCA=False)                    #specify here what data preps you want included in the comparison
     
     true_false_combinations = create_tf_combinations(len(n_features_list), [])      #generates lists of True and False in all possible combinations with length of the number of encodings, here 7 (4 ligand + 3 protein)
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
 
-    for encoding_bools in valid_tf_combinations:
-        included_encodings = []                         #keeps track of the encodings included in this iteration
-        for i in range(len(encoding_bools)):
-            if encoding_bools[i]:
-                included_encodings.append(order_of_encodings[i])
-        print(f'This iterations uses the features from: {included_encodings}')
-        score, best_dataprep=data_prep_cv(data_prep_dict,affinity, n_estimators, max_depth, min_samples_split,
-                                          min_samples_leaf, max_features)
-        sliced_data_dict={}
-        for current_data_source, current_X_train in data_prep_dict.items():
+    data_prep_scores = {}                               #for each data prepping strategy, will include a list of all mae scores that used this prepping
+    for data_prep in list(data_prep_dict.keys()):
+        data_prep_scores[data_prep]=[]
+
+    all_scores = []
+    for encoding_bools in valid_tf_combinations:        #encoding_bools is a list of True and False
+        sliced_data_dict={}                             #will be identical to data_prep_dict but sliced to include only the encodings of this iteration
+        for current_prep_name, current_X_train in data_prep_dict.items():
             sliced_X = slicing_features(current_X_train, n_features_list, encoding_bools)
-            sliced_data_dict[current_data_source] = sliced_X
-        print(f'The score is {score}')                            
-        if score>bestscore:
+            sliced_data_dict[current_prep_name] = sliced_X
+
+        score, best_dataprep, data_prep_scores=data_prep_cv(sliced_data_dict, affinity, data_prep_scores, n_estimators, max_depth, 
+                                                            min_samples_split, min_samples_leaf, max_features)                          
+        if score < bestscore:
             bestscore = score
             bestbools = encoding_bools
-            bestligandf = bestbools[0]
-            besttopological = bestbools[1]
-            bestmorgan = bestbools[2]
-            bestmacckeys = bestbools[3]
-            bestpeptidef = bestbools[4]
-            bestwindowbased = bestbools[5]
-            bestautocorrelation = bestbools[6]
-            bestdataprep = best_dataprep
-
+        print(f'{encoding_bools},{score}')
         print('')
+   
+    prep_averages = {}
+    for data_prep, scores in data_prep_scores.items():
+        prep_averages[data_prep] = np.mean(scores)
+    min_average = min(prep_averages.values())
+    index = list(prep_averages.values()).index(min_average)
+    min_prep_name = list(prep_averages.keys())[index]
 
     print("training took "+str((time.time()-starttime)/3600)+" hours")
     print("")
-    print(f"best result is: {bestscore}")
-    print(f"and is achieved with the following adjustments: {bestbools}")
-    print(f"best dataprep: {bestdataprep}")
+    print(f"best MAE is: {bestscore}")
+    print(f"and is achieved with: {bestbools}")
+    print("")
+    print(f"the data prep score averages are: {prep_averages}, so the best one is {min_prep_name}")
+
+
 
 if kaggle==True:
     starttime=time.time()
@@ -889,14 +891,15 @@ if kaggle==True:
         print("model is trained")
         kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
 
-    elif clipping and not scaling:
-        X_train_cleaned,clip=clipping_outliers_train(X_train)
-        X_validation_cleaned=clipping_outliers_test(X_test,clip)
+    if cleaning is True:
+        X_train,clean=clipping_outliers_train(X_train)
+        X_validation=clipping_outliers_test(X_test,clean)
         print("sets are cleaned")
-        model=train_model(X_train_cleaned,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
-                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
+        model=train_model(X_train,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
+                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         print("model is trained")
-        kaggle_submission(X_validation_cleaned,model,"docs/Kaggle_submission.csv")
+        kaggle_submission(X_validation,model,"docs/Kaggle_submission.csv")
 
     elif clipping and scaling:
         X_clipped,clip=clipping_outliers_train(X_train)
@@ -925,30 +928,62 @@ if kaggle==True:
     print("this took " + str(endtime-starttime) + " seconds")
 
 if errors is True:
-    print("started")
+    print("started errors")
     starttime=time.time()
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
-    encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
-                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
+                      'peptidef': True, 'windowbasedf': True, 'autocorrelationf': True}
     X = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
     print("data array has been made")
     training_set, validation_set = train_validation_split(X,y,0.8)
     X_train, y_train_true = training_set
     X_validation, y_validation_true = validation_set
-    print(f"data has been splitted into two sets, of size {np.shape(X_train)} and {np.shape(X_validation)}")
-    n_estimators = 450
+    print(f"data has been splitted into two sets")
+    n_estimators = 400
     max_depth = None
     min_samples_split = 2
     min_samples_leaf = 1
     max_features = None
-    X_train_cleaned,clip=clipping_outliers_train(X_train)
-    X_validation_cleaned=clipping_outliers_test(X_validation,clip)
-    print('data has been cleaned')
     rf_model = train_model(X_train, y_train_true, n_estimators=n_estimators, max_depth=max_depth, 
                         min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features)
     print(f"model has been trained, time passed: {(time.time()-starttime)/60}")
-    calculate_errors(X_train=X_train_cleaned, y_train_true=y_train_true, X_validation=X_validation_cleaned, y_validation_true=y_validation_true,
+    calculate_errors(X_train=X_train, y_train_true=y_train_true, X_validation=X_validation, y_validation_true=y_validation_true,
                      encoding_bools=encoding_bools, rf_model=rf_model, n_estimators=n_estimators,
                       max_depth=max_depth, min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split, max_features=max_features)
     print(f"total time: {(time.time()-starttime)/60}")
+
+
+if many_errors is True:
+    n_estimators = 400
+    max_depth = None
+    min_samples_split = 2
+    min_samples_leaf = 1
+    max_features = None
+    options_to_try = [[False, True, True, False, True, True, True], [True, True, False, False, False, True, False],[False, True, False, True, True, False, True], 
+                    [True, True, True, False, True, False, False], [True, True, False, True, False, True, False], [True, True, False, True, True, False, False],
+                    [True, True, False, False, True, True, True], [False, True, False, True, True, True, False],[True,False,True,False,True,True,False], 
+                    [False,True,True,False,False,False,True],[True,True,True,False,True,True,True],[False,True,False,False,False,True,False],
+                    [True,True,True,False,True,False,True],[False,False,True,False,True,False,False],[True,True,True,True,False,True,False]]
+    encoding_bools={'ligandf': None, 'topologicalf': None, 'morganf': None, 'macckeysf': None, 'peptidef': None, 'windowbasedf': None, 'autocorrelationf': None}
+    print("started many_errors")
+    starttime=time.time()
+    uniprot_dict=extract_sequence("data/protein_info.csv")  
+    data_dictionary,affinity=extract_all_features("data/train.csv",encoding_names=list(encoding_bools.keys()))
+    lf_array,n_lf_features=data_dictionary['ligandf']
+    tf_array,n_tf_features=data_dictionary['topologicalf']
+    mo_array,n_mo_features=data_dictionary['morganf']
+    ma_array,n_ma_features=data_dictionary['macckeysf']
+    pf_array,n_pf_features=data_dictionary['peptidef']
+    wb_array,n_wb_features=data_dictionary['windowbasedf']
+    ac_array,n_ac_features=data_dictionary['autocorrelationf']
+
+    all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+    n_features_list=[n_lf_features,n_tf_features,n_mo_features,n_ma_features,n_pf_features,n_wb_features,n_ac_features]
+    print(f"large array has been made, time passed: {(time.time() - starttime)/60} minutes")
+    for encoding_bools in valid_tf_combinations:
+        included_encodings = []                         #keeps track of the encodings included in this iteration
+        for i in range(len(encoding_bools)):
+            if encoding_bools[i]:
+                included_encodings.append(order_of_encodings[i])
+        print(f'Encodings: {included_encodings}')
