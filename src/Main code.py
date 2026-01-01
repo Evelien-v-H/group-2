@@ -893,7 +893,7 @@ if kaggle==True:
         X_train_cleaned,clip=clipping_outliers_train(X_train)
         X_validation_cleaned=clipping_outliers_test(X_test,clip)
         print("sets are cleaned")
-        model=train_model(X_scaled,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+        model=train_model(X_train_cleaned,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
                           min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
         kaggle_submission(X_validation_cleaned,model,"docs/Kaggle_submission.csv")
