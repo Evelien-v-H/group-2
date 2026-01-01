@@ -1,7 +1,8 @@
-run=False
+run=True
 kaggle=False
 tuning=False
-errors=True
+errors=False
+many_errors=False
 
 import pandas as pd
 import numpy as np
@@ -643,20 +644,19 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
                  min_samples_split=2, min_samples_leaf=1, max_features=None):
     """performs cross-validation on the different data sources in data_prep_dict. These can for example be functionalities 
     like scaling and clipping outliers included or excluded."""
-    highest_cv_score = 0
-    for current_data_prep, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        score_list_current_prep = data_prep_scores[current_data_prep]           #a list of the scores of this data prepping
+    best_cv_score = 0
+    for current_prep_name, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
+        score_list_current_prep = data_prep_scores[current_prep_name]           #a list of the scores of this data prepping
         estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
                                           min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2, verbose=0)
         neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-2, cv=5, scoring='neg_mean_absolute_error').mean()
         mean_cv_score = -neg_mean_cv_score
-        print(f'For {current_data_prep}, the mae is {mean_cv_score}')
         score_list_current_prep.append(mean_cv_score)
-        if mean_cv_score > highest_cv_score:        
-            highest_cv_score = mean_cv_score
-            best_dataprep = current_data_prep          #keeps track of the best data prep thus far
-        data_prep_scores[current_data_prep] = score_list_current_prep
-    return highest_cv_score, best_dataprep, data_prep_scores
+        if mean_cv_score < best_cv_score:        
+            best_cv_score = mean_cv_score
+            best_dataprep = current_prep_name          #keeps track of the best data prep thus far
+        data_prep_scores[current_prep_name] = score_list_current_prep
+    return best_cv_score, best_dataprep, data_prep_scores
 
 def make_data_prep_dict(X_train_raw,include_only_cleaning,include_scaling=True,include_clipping=True,include_PCA='clipping'):
     """applies different data preppings to X_train_raw, depending on what boolean parameters have been set to true.
@@ -827,41 +827,40 @@ if run is True:
     true_false_combinations = create_tf_combinations(len(n_features_list), [])      #generates lists of True and False in all possible combinations with length of the number of encodings, here 7 (4 ligand + 3 protein)
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
 
-    data_prep_scores = {}
+    data_prep_scores = {}                               #for each data prepping strategy, will include a list of all mae scores that used this prepping
     for data_prep in list(data_prep_dict.keys()):
         data_prep_scores[data_prep]=[]
 
+    all_scores = []
     for encoding_bools in valid_tf_combinations:        #encoding_bools is a list of True and False
-        included_encodings = []                         #keeps track of the encodings included in this iteration, only needed for printing this information
-        for i in range(len(encoding_bools)):
-            if encoding_bools[i]:
-                included_encodings.append(order_of_encodings[i])
-        print(f'Encodings: {included_encodings}')
         sliced_data_dict={}                             #will be identical to data_prep_dict but sliced to include only the encodings of this iteration
-        for current_data_prep, current_X_train in data_prep_dict.items():
+        for current_prep_name, current_X_train in data_prep_dict.items():
             sliced_X = slicing_features(current_X_train, n_features_list, encoding_bools)
-            sliced_data_dict[current_data_prep] = sliced_X
+            sliced_data_dict[current_prep_name] = sliced_X
 
         score, best_dataprep, data_prep_scores=data_prep_cv(sliced_data_dict, affinity, data_prep_scores, n_estimators, max_depth, 
-                                                            min_samples_split, min_samples_leaf, max_features)
-        print(f'The MAE is {score}')                            
+                                                            min_samples_split, min_samples_leaf, max_features)                          
         if score < bestscore:
             bestscore = score
             bestbools = encoding_bools
-            bestdataprep = best_dataprep
+        print(f'{encoding_bools},{score}')
         print('')
    
-    prep_averages={}
+    prep_averages = {}
     for data_prep, scores in data_prep_scores.items():
         prep_averages[data_prep] = np.mean(scores)
+    min_average = min(prep_averages.values())
+    index = list(prep_averages.values()).index(min_average)
+    min_prep_name = list(prep_averages.keys())[index]
 
     print("training took "+str((time.time()-starttime)/3600)+" hours")
     print("")
     print(f"best MAE is: {bestscore}")
-    print(f"and is achieved with the following adjustments: {bestbools}")
-    print(f"best dataprep: {bestdataprep}")
+    print(f"and is achieved with: {bestbools}")
     print("")
-    print(f"the data prep score averages are: {prep_averages}")
+    print(f"the data prep score averages are: {prep_averages}, so the best one is {min_prep_name}")
+
+
 
 if kaggle==True:
     starttime=time.time()
