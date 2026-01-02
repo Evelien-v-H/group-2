@@ -1,4 +1,4 @@
-run=False
+run=True
 kaggle=False
 tuning=False
 errors=True
@@ -289,7 +289,7 @@ def data_cleaning_train(data):
             if i not in irrelevant_colums:
                 if is_number(data[k,i]) is True:
                     if float(data[k,i])>=np.finfo(np.float32).max:
-                        raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manual")
+                        raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manually")
                     else:
                         data[k,i]=float(data[k,i])
             
@@ -318,7 +318,7 @@ def data_cleaning_test(data,mean_value_coloms, irrelevant_colums):
         for j in range(data.shape[0]):
             if is_number(data[j,i]) is True:
                 if float(data[j,i])>=np.finfo(np.float32).max:
-                    raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manual")
+                    raise ValueError("Youre value is to big for the float32 of the random forest. Solve this manually")
                 else:
                     data[j,i]=float(data[j,i])
             else:
@@ -583,24 +583,21 @@ def slicing_features(large_feature_array, n_features_list, bool_list):
         bool_list (list): contains the booleans corresponding to each feature, in the same order.
     
     Returns:
-        sliced_features (np.array): np.array of shape (n_samples, n_features) that consists of all features of which the boolean
+        sliced_features_array (np.array): np.array of shape (n_samples, n_features) that consists of all features of which the boolean
             input parameter was set to True.
     
     """                               #keeps track of the encodings included in the output
     cumulative_n_features = np.cumsum(n_features_list)
-    sliced_features=None
+    sliced_features=[]
 
     for i in range(len(bool_list)):
         if bool_list[i]:
-            start_index = cumulative_n_features[i]
-            stop_index = start_index + n_features_list[i]
+            stop_index = cumulative_n_features[i]
+            start_index = cumulative_n_features[i] - n_features_list[i]
             array_to_be_added = large_feature_array[:,start_index:stop_index]
-            if sliced_features is None:                       
-                sliced_features = array_to_be_added         #it is impossible to concatenate something to an empty array
-            else:
-                sliced_features = np.concatenate((sliced_features, array_to_be_added), axis=1)
-
-    return sliced_features
+            sliced_features.append(array_to_be_added)
+    sliced_features_array = np.concatenate(sliced_features, axis=1)
+    return sliced_features_array
 
 def create_tf_combinations(remaining, current):
     """returns list of lists of all possible combinations of True and False. Remaining (int) indicates the length of each list of booleans. 
@@ -654,13 +651,12 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
                                           min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2, verbose=0)
         neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-2, cv=5, scoring='neg_mean_absolute_error').mean()
         mean_cv_score = -neg_mean_cv_score
-        print(f'For {current_data_prep}, the mae is {mean_cv_score}')
         score_list_current_prep.append(mean_cv_score)
-        if mean_cv_score > highest_cv_score:        
-            highest_cv_score = mean_cv_score
-            best_dataprep = current_data_prep          #keeps track of the best data prep thus far
-        data_prep_scores[current_data_prep] = score_list_current_prep
-    return highest_cv_score, best_dataprep, data_prep_scores
+        if mean_cv_score < best_cv_score:        
+            best_cv_score = mean_cv_score
+            best_dataprep = current_prep_name          #keeps track of the best data prep thus far
+        data_prep_scores[current_prep_name] = score_list_current_prep
+    return best_cv_score, best_dataprep, data_prep_scores
 
 def make_data_prep_dict(X_train_raw,include_only_cleaning,include_scaling=True,include_clipping=True,include_PCA='clipping'):
     """applies different data preppings to X_train_raw, depending on what boolean parameters have been set to true.
@@ -831,64 +827,68 @@ if run is True:
     true_false_combinations = create_tf_combinations(len(n_features_list), [])      #generates lists of True and False in all possible combinations with length of the number of encodings, here 7 (4 ligand + 3 protein)
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
 
-    data_prep_scores = {}
+    data_prep_scores = {}                               #for each data prepping strategy, will include a list of all mae scores that used this prepping
     for data_prep in list(data_prep_dict.keys()):
         data_prep_scores[data_prep]=[]
 
-    for encoding_bools in valid_tf_combinations:
-        included_encodings = []                         #keeps track of the encodings included in this iteration
-        for i in range(len(encoding_bools)):
-            if encoding_bools[i]:
-                included_encodings.append(order_of_encodings[i])
-        print(f'Encodings: {included_encodings}')
-        score, best_dataprep, data_prep_scores=data_prep_cv(data_prep_dict, affinity, data_prep_scores, n_estimators, max_depth, min_samples_split,
-                                                            min_samples_leaf, max_features)
-        sliced_data_dict={}
-        for current_data_source, current_X_train in data_prep_dict.items():
+    all_scores = []
+    for encoding_bools in valid_tf_combinations:        #encoding_bools is a list of True and False
+        sliced_data_dict={}                             #will be identical to data_prep_dict but sliced to include only the encodings of this iteration
+        for current_prep_name, current_X_train in data_prep_dict.items():
             sliced_X = slicing_features(current_X_train, n_features_list, encoding_bools)
-            sliced_data_dict[current_data_source] = sliced_X
-        print(f'The MAE is {score}')                            
-        if score>bestscore:
+            sliced_data_dict[current_prep_name] = sliced_X
+
+        score, best_dataprep, data_prep_scores=data_prep_cv(sliced_data_dict, affinity, data_prep_scores, n_estimators, max_depth, 
+                                                            min_samples_split, min_samples_leaf, max_features)                          
+        if score < bestscore:
             bestscore = score
             bestbools = encoding_bools
         print(f'{encoding_bools},{score}')
    
-    prep_averages={}
+    prep_averages = {}
     for data_prep, scores in data_prep_scores.items():
         prep_averages[data_prep] = np.mean(scores)
+    min_average = min(prep_averages.values())
+    index = list(prep_averages.values()).index(min_average)
+    min_prep_name = list(prep_averages.keys())[index]
 
     print("training took "+str((time.time()-starttime)/3600)+" hours")
     print("")
     print(f"best MAE is: {bestscore}")
-    print(f"and is achieved with the following adjustments: {bestbools}")
-    print(f"best dataprep: {bestdataprep}")
+    print(f"and is achieved with: {bestbools}")
     print("")
-    print(f"the data prep score averages are: {prep_averages}")
+    print(f"the data prep score averages are: {prep_averages}, so the best one is {min_prep_name}")
+
+
 
 if kaggle==True:
     starttime=time.time()
-    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
+    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
-    scaling=False
-    cleaning=True
+    scaling=False           #Determines whether scaling will be applied
+    clipping=True           #Determines whether outliers will be clipped
+    n_estimators=450        #Vul hier je hyperparameters in
+    max_depth=None
+    min_samples_split=2
+    min_samples_leaf=1
+    max_features=None
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
     smiles_test,uniprot_ids_test,unknown_affinity=data_to_SMILES_UNIProt_ID("data/test.csv")
-    X_train = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
+    X_train,mean_value_list, irrelevant_feature_list = data_cleaning_train(extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train))
     print("trainingset is prepared")
-    X_test = extract_true_features(encoding_bools, uniprot_dict, smiles_test, uniprot_ids_test)
+    X_test = data_cleaning_test(extract_true_features(encoding_bools, uniprot_dict, smiles_test, uniprot_ids_test),mean_value_list, irrelevant_feature_list)
     print("testset is prepared")
-    if scaling is True:
+    if scaling and not clipping:
         scaler=set_scaling(X_train)
         X_scaled=data_scaling(scaler,X_train)
         print("trainingset is scaled")
-        X_test_scaled=data_scaling(scaler,X_test)
+        X_test_clipped_scaled=data_scaling(scaler,X_test)
         print("testset is scaled")
-        model=train_model(X_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features='sqrt', max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        model=train_model(X_scaled,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
-        kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
+        kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
 
     if clipping is True:
         X_train,clean=clipping_outliers_train(X_train)
@@ -900,19 +900,26 @@ if kaggle==True:
         print("model is trained")
         kaggle_submission(X_validation,model,"docs/Kaggle_submission.csv")
 
-    if cleaning is True and scaling is True:
-        scaler=set_scaling(X_train)
-        X_scaled=data_scaling(scaler,X_train)
+    elif clipping and scaling:
+        X_clipped,clip=clipping_outliers_train(X_train)
+        print("trainingset is clipped")
+        X_test_clipped=clipping_outliers_test(X_test,clip)  
+        print("testset is clipped")      
+        scaler=set_scaling(X_clipped)
+        X_clipped_scaled=data_scaling(scaler,X_clipped)
         print("trainingset is scaled")
-        X_test_scaled=data_scaling(scaler,X_test)
+        X_test_clipped_scaled=data_scaling(scaler,X_test_clipped)
         print("testset is scaled")
-        X_cleaned_scaled,clean=clipping_outliers_train(X_scaled)
-        X_test_cleaned_scaled=clipping_outliers_test(X_test_scaled,clean)
-        model=train_model(X_cleaned_scaled,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features='sqrt', max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        model=train_model(X_clipped_scaled,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
-        kaggle_submission(X_test_cleaned_scaled,model,"docs/Kaggle_submission.csv")
+        kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
+
+    if not clipping and not scaling:
+        model=train_model(X_train,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                    min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
+        print("model is trained")
+        kaggle_submission(X_test,model,"docs/Kaggle_submission.csv") 
 
     print("file is made with predictions")
     endtime=time.time()
@@ -920,7 +927,7 @@ if kaggle==True:
     print("this took " + str(endtime-starttime) + " seconds")
 
 if errors is True:
-    print("started")
+    print("started errors")
     starttime=time.time()
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
@@ -952,7 +959,11 @@ if many_errors is True:
     min_samples_split = 2
     min_samples_leaf = 1
     max_features = None
-    options_to_try = []
+    options_to_try = [[False, True, True, False, True, True, True], [True, True, False, False, False, True, False],[False, True, False, True, True, False, True], 
+                    [True, True, True, False, True, False, False], [True, True, False, True, False, True, False], [True, True, False, True, True, False, False],
+                    [True, True, False, False, True, True, True], [False, True, False, True, True, True, False],[True,False,True,False,True,True,False], 
+                    [False,True,True,False,False,False,True],[True,True,True,False,True,True,True],[False,True,False,False,False,True,False],
+                    [True,True,True,False,True,False,True],[False,False,True,False,True,False,False],[True,True,True,True,False,True,False]]
     encoding_bools={'ligandf': None, 'topologicalf': None, 'morganf': None, 'macckeysf': None, 'peptidef': None, 'windowbasedf': None, 'autocorrelationf': None}
     print("started many_errors")
     starttime=time.time()
