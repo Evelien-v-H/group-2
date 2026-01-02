@@ -1,7 +1,7 @@
 run=False
-kaggle=True
+kaggle=False
 tuning=False
-errors=False
+errors=True
 many_errors=False
 
 import pandas as pd
@@ -413,9 +413,9 @@ def calculate_errors(X_train, y_train_true, X_validation, y_validation_true,
         print(f"and parameters: {params}")
     print(f'the MAE on the train set is: {mae_train} and on the validation set: {mae_validation}')
 
-def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+def train_model(X,y,n_estimators=100,  criterion='absolute_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
+                oob_score=False, n_jobs=-1, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
     """Trains the model
       
     Input:X is the matrix with features and samples, y is the affinityscore in an array which is coupled with the sample
@@ -644,7 +644,7 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
                  min_samples_split=2, min_samples_leaf=1, max_features=None):
     """performs cross-validation on the different data sources in data_prep_dict. These can for example be functionalities 
     like scaling and clipping outliers included or excluded."""
-    best_cv_score = 0
+    best_cv_score = 100
     for current_prep_name, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
         score_list_current_prep = data_prep_scores[current_prep_name]           #a list of the scores of this data prepping
         estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
@@ -748,7 +748,7 @@ def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomiz
     """
     model = RandomForestRegressor()
     if search_type=='grid':
-        estimator = GridSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, verbose=3, scoring=scoring)
+        estimator = GridSearchCV(model, param_grids, n_jobs=-1, refit=True, cv=cv_fold, verbose=3, scoring=scoring)
     elif search_type=='randomized':
         estimator = RandomizedSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, n_iter=n_iter, verbose=2, scoring=scoring)
     estimator.fit(X,y)
@@ -759,37 +759,37 @@ def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomiz
 
 
 if tuning is True:
-    create_validation = True
-    errors_after_tuning = True
+    create_validation = False
+    errors_after_tuning = False
     starttime=time.time()
     print("started tuning")
-    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
+    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     uniprot_dict=extract_sequence("data/protein_info.csv")  
-    smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
+    smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
     X_train = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
     if create_validation is True:
-        training_set, validation_set = train_validation_split(X_train,y,0.8)
-        X_train, y = training_set  
+        training_set, validation_set = train_validation_split(X_train,y_train,0.8)
+        X_train, y_train = training_set  
         X_validation, y_validation_true = validation_set
     print(f'data array has been made, this took {(time.time()-starttime)/60} minutes')
-    scaler=set_scaling(X_train)
-    X_scaled=data_scaling(scaler,X_train)
-    print("data is scaled")
+    # scaler=set_scaling(X_train)
+    # X_scaled=data_scaling(scaler,X_train)
+    # print("data is scaled")
     n_estimators_grid = [400]
-    max_depth_grid =[45,50,55]
+    max_depth_grid =[4,41,43,45]
     min_samples_split_grid = [2]
     min_samples_leaf_grid = [1]
     max_features_grid = [None]
     param_options = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
                      'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
-    best_params, best_score, best_estimator = hyperparams_cv(X_scaled,y,param_options,n_iter=120,cv_fold=5,search_type='grid')
+    best_params, best_score, best_estimator = hyperparams_cv(X_train,y_train,param_options,n_iter=120,cv_fold=3,search_type='grid')
     print(best_params, best_score)
     total_time = time.time()-starttime
     print(f"this took {total_time} seconds, which is {total_time/60} minutes")
     if errors_after_tuning:
         model = best_estimator
-        calculate_errors(X_train=X_scaled, y_train_true=y, X_validation=X_validation, y_validation_true=y_validation_true,
+        calculate_errors(X_train=X_train, y_train_true=y_train, X_validation=X_validation, y_validation_true=y_validation_true,
                          encoding_bools=encoding_bools, rf_model=model, params=best_params)
         print(f'this took {(time.time()-starttime)/60} minutes')
 
@@ -798,7 +798,7 @@ if tuning is True:
 if run is True:                
     starttime=time.time()
     print("started")
-    bestscore=0
+    bestscore=100
     order_of_encodings = ['ligandf', 'topologicalf', 'morganf', 'macckeysf', 'peptidef', 'windowbasedf', 'autocorrelationf']
     encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
@@ -844,7 +844,6 @@ if run is True:
             bestscore = score
             bestbools = encoding_bools
         print(f'{encoding_bools},{score}')
-        print('')
    
     prep_averages = {}
     for data_prep, scores in data_prep_scores.items():
@@ -873,7 +872,7 @@ if kaggle==True:
     min_samples_leaf=1
     max_features=None
     uniprot_dict=extract_sequence("data/protein_info.csv")  
-    smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
+    smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
     smiles_test,uniprot_ids_test,unknown_affinity=data_to_SMILES_UNIProt_ID("data/test.csv")
     X_train,mean_value_list, irrelevant_feature_list = data_cleaning_train(extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train))
     print("trainingset is prepared")
@@ -885,7 +884,7 @@ if kaggle==True:
         print("trainingset is scaled")
         X_test_clipped_scaled=data_scaling(scaler,X_test)
         print("testset is scaled")
-        model=train_model(X_scaled,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+        model=train_model(X_scaled,y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
                           min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
         kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
@@ -894,7 +893,7 @@ if kaggle==True:
         X_train,clean=clipping_outliers_train(X_train)
         X_validation=clipping_outliers_test(X_test,clean)
         print("sets are cleaned")
-        model=train_model(X_train,y, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+        model=train_model(X_train,y_train, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
         print("model is trained")
@@ -910,13 +909,13 @@ if kaggle==True:
         print("trainingset is scaled")
         X_test_clipped_scaled=data_scaling(scaler,X_test_clipped)
         print("testset is scaled")
-        model=train_model(X_clipped_scaled,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+        model=train_model(X_clipped_scaled,y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
                           min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
         kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
 
     if not clipping and not scaling:
-        model=train_model(X_train,y, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+        model=train_model(X_train,y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
                     min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
         print("model is trained")
         kaggle_submission(X_test,model,"docs/Kaggle_submission.csv") 
@@ -930,24 +929,27 @@ if errors is True:
     print("started errors")
     starttime=time.time()
     uniprot_dict=extract_sequence("data/protein_info.csv")  
-    smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
+    smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
     encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
-                      'peptidef': True, 'windowbasedf': True, 'autocorrelationf': True}
+                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     X = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
     print("data array has been made")
-    training_set, validation_set = train_validation_split(X,y,0.8)
-    X_train, y_train_true = training_set
+    training_set, validation_set = train_validation_split(X,y_train,0.8)
+    X_train, y_train = training_set
     X_validation, y_validation_true = validation_set
     print(f"data has been splitted into two sets")
+    X_train_clipped, clip = clipping_outliers_train(X_train)
+    X_validation_clipped = clipping_outliers_test(X_validation, clip)
+    print(f"data has been clipped")
     n_estimators = 400
     max_depth = None
     min_samples_split = 2
     min_samples_leaf = 1
     max_features = None
-    rf_model = train_model(X_train, y_train_true, n_estimators=n_estimators, max_depth=max_depth, 
-                        min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features)
+    rf_model = train_model(X_train, y_train, n_estimators=n_estimators, max_depth=max_depth, 
+                        min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
     print(f"model has been trained, time passed: {(time.time()-starttime)/60}")
-    calculate_errors(X_train=X_train, y_train_true=y_train_true, X_validation=X_validation, y_validation_true=y_validation_true,
+    calculate_errors(X_train=X_train, y_train_true=y_train, X_validation=X_validation, y_validation_true=y_validation_true,
                      encoding_bools=encoding_bools, rf_model=rf_model, n_estimators=n_estimators,
                       max_depth=max_depth, min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split, max_features=max_features)
     print(f"total time: {(time.time()-starttime)/60}")
@@ -967,6 +969,7 @@ if many_errors is True:
     encoding_bools={'ligandf': None, 'topologicalf': None, 'morganf': None, 'macckeysf': None, 'peptidef': None, 'windowbasedf': None, 'autocorrelationf': None}
     print("started many_errors")
     starttime=time.time()
+
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     data_dictionary,affinity=extract_all_features("data/train.csv",encoding_names=list(encoding_bools.keys()))
     lf_array,n_lf_features=data_dictionary['ligandf']
