@@ -802,7 +802,7 @@ if tuning is True:
 if run is True:                
     starttime=time.time()
     print("started")
-    bestscore=0
+    bestscore=100
     order_of_encodings = ['ligandf', 'topologicalf', 'morganf', 'macckeysf', 'peptidef', 'windowbasedf', 'autocorrelationf']
     encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
