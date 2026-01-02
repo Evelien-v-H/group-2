@@ -1,5 +1,5 @@
-run=True
-kaggle=False
+run=False
+kaggle=True
 tuning=False
 errors=False
 many_errors=False
@@ -864,11 +864,10 @@ if run is True:
 
 if kaggle==True:
     starttime=time.time()
-    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
-                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    encoding_bools = {'ligandf': False, 'topologicalf': True, 'morganf': True, 'macckeysf': False, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     scaling=False           #Determines whether scaling will be applied
     clipping=True           #Determines whether outliers will be clipped
-    n_estimators=450        #Vul hier je hyperparameters in
+    n_estimators=400        #Vul hier je hyperparameters in
     max_depth=None
     min_samples_split=2
     min_samples_leaf=1
@@ -891,7 +890,7 @@ if kaggle==True:
         print("model is trained")
         kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
 
-    if cleaning is True:
+    if clipping is True:
         X_train,clean=clipping_outliers_train(X_train)
         X_validation=clipping_outliers_test(X_test,clean)
         print("sets are cleaned")
