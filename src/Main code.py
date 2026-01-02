@@ -2,6 +2,7 @@ run=False
 kaggle=False
 tuning=False
 errors=True
+many_errors=False
 
 import pandas as pd
 import numpy as np
@@ -646,9 +647,9 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
                  min_samples_split=2, min_samples_leaf=1, max_features=None):
     """performs cross-validation on the different data sources in data_prep_dict. These can for example be functionalities 
     like scaling and clipping outliers included or excluded."""
-    highest_cv_score = 0
-    for current_data_prep, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
-        score_list_current_prep = data_prep_scores[current_data_prep]           #a list of the scores of this data prepping
+    best_cv_score = 100
+    for current_prep_name, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
+        score_list_current_prep = data_prep_scores[current_prep_name]           #a list of the scores of this data prepping
         estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
                                           min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2, verbose=0)
         neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-2, cv=5, scoring='neg_mean_absolute_error').mean()
@@ -762,11 +763,11 @@ def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomiz
 
 
 if tuning is True:
-    create_validation = True
-    errors_after_tuning = True
+    create_validation = False
+    errors_after_tuning = False
     starttime=time.time()
     print("started tuning")
-    encoding_bools = {'ligandf':True, 'topologicalf':True, 'morganf': False, 'macckeysf': False, 
+    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
@@ -786,7 +787,7 @@ if tuning is True:
     max_features_grid = [None]
     param_options = {'n_estimators':n_estimators_grid, 'max_depth':max_depth_grid, 'min_samples_split':min_samples_split_grid,
                      'min_samples_leaf':min_samples_leaf_grid, 'max_features':max_features_grid}
-    best_params, best_score, best_estimator = hyperparams_cv(X_scaled,y,param_options,n_iter=120,cv_fold=5,search_type='grid')
+    best_params, best_score, best_estimator = hyperparams_cv(X_train,y,param_options,n_iter=120,cv_fold=5,search_type='grid')
     print(best_params, best_score)
     total_time = time.time()-starttime
     print(f"this took {total_time} seconds, which is {total_time/60} minutes")
@@ -850,8 +851,7 @@ if run is True:
         if score>bestscore:
             bestscore = score
             bestbools = encoding_bools
-            bestdataprep = best_dataprep
-        print('')
+        print(f'{encoding_bools},{score}')
    
     prep_averages={}
     for data_prep, scores in data_prep_scores.items():
@@ -890,7 +890,7 @@ if kaggle==True:
         print("model is trained")
         kaggle_submission(X_test_scaled,model,"docs/Kaggle_submission.csv")
 
-    if cleaning is True:
+    if clipping is True:
         X_train,clean=clipping_outliers_train(X_train)
         X_validation=clipping_outliers_test(X_test,clean)
         print("sets are cleaned")
@@ -925,7 +925,7 @@ if errors is True:
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y=data_to_SMILES_UNIProt_ID("data/train.csv")
     encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
-                      'peptidef': True, 'windowbasedf': True, 'autocorrelationf': True}
+                      'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     X = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
     print("data array has been made")
     training_set, validation_set = train_validation_split(X,y,0.8)
@@ -938,9 +938,50 @@ if errors is True:
     min_samples_leaf = 1
     max_features = None
     rf_model = train_model(X_train, y_train_true, n_estimators=n_estimators, max_depth=max_depth, 
-                        min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features)
+                        min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features, n_jons=-2)
     print(f"model has been trained, time passed: {(time.time()-starttime)/60}")
     calculate_errors(X_train=X_train, y_train_true=y_train_true, X_validation=X_validation, y_validation_true=y_validation_true,
                      encoding_bools=encoding_bools, rf_model=rf_model, n_estimators=n_estimators,
                       max_depth=max_depth, min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split, max_features=max_features)
     print(f"total time: {(time.time()-starttime)/60}")
+
+
+if many_errors is True:
+    n_estimators = 400
+    max_depth = None
+    min_samples_split = 2
+    min_samples_leaf = 1
+    max_features = None
+    options_to_try = []
+    encoding_bools={'ligandf': None, 'topologicalf': None, 'morganf': None, 'macckeysf': None, 'peptidef': None, 'windowbasedf': None, 'autocorrelationf': None}
+    print("started many_errors")
+    starttime=time.time()
+    uniprot_dict=extract_sequence("data/protein_info.csv")  
+    data_dictionary,affinity=extract_all_features("data/train.csv",encoding_names=list(encoding_bools.keys()))
+    lf_array,n_lf_features=data_dictionary['ligandf']
+    tf_array,n_tf_features=data_dictionary['topologicalf']
+    mo_array,n_mo_features=data_dictionary['morganf']
+    ma_array,n_ma_features=data_dictionary['macckeysf']
+    pf_array,n_pf_features=data_dictionary['peptidef']
+    wb_array,n_wb_features=data_dictionary['windowbasedf']
+    ac_array,n_ac_features=data_dictionary['autocorrelationf']
+
+    all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
+    n_features_list=[n_lf_features,n_tf_features,n_mo_features,n_ma_features,n_pf_features,n_wb_features,n_ac_features]
+    print(f"large array has been made, time passed: {(time.time() - starttime)/60} minutes")
+    for encoding_bools in valid_tf_combinations:
+        included_encodings = []                         #keeps track of the encodings included in this iteration
+        for i in range(len(encoding_bools)):
+            if encoding_bools[i]:
+                included_encodings.append(order_of_encodings[i])
+        print(f'Encodings: {included_encodings}')
+
+def plot_experiment(x,y,xlabel,ylabel,title):
+    plt.scatter(x,y)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.show
+
+
+# plot_experiment()
