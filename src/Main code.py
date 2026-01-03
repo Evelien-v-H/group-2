@@ -142,15 +142,15 @@ class small_molecule:
     
         return array
     
-    def macckeys(self):
-        """This function gets the macckeys of an molecule
+    def maccskeys(self):
+        """This function gets the MACCS-keys of an molecule
         
         input: self 
         
         output: an array"""
-        macckeys = MACCSkeys.GenMACCSKeys(self.molecule)
-        array = np.zeros((macckeys.GetNumBits(),), dtype=int)
-        DataStructs.ConvertToNumpyArray(macckeys, array)
+        maccskeys = MACCSkeys.GenMACCSKeys(self.molecule)
+        array = np.zeros((maccskeys.GetNumBits(),), dtype=int)
+        DataStructs.ConvertToNumpyArray(maccskeys, array)
         return array
     
 class protein:
@@ -449,7 +449,7 @@ def extract_true_features(encoding_bools_dict, uniprot_dict, SMILES, UNIProt_ID)
     ligand_list=[]
     topological_list=[]
     morgan_list=[]
-    macckeys_list=[]
+    maccskeys_list=[]
     peptide_list=[]
     windowbased_list=[]
     autocorrelation_list=[]
@@ -469,9 +469,9 @@ def extract_true_features(encoding_bools_dict, uniprot_dict, SMILES, UNIProt_ID)
         if encoding_bools_dict['morganf']:
             ligand_morgan=ligand.morgan_fingerprint()
             morgan_list.append(ligand_morgan)
-        if encoding_bools_dict['macckeysf']:
-            ligand_macckeys=ligand.macckeys()
-            macckeys_list.append(ligand_macckeys)
+        if encoding_bools_dict['maccskeysf']:
+            ligand_maccskeys=ligand.maccskeys()
+            maccskeys_list.append(ligand_maccskeys)
         if encoding_bools_dict['peptidef']:
             peptide_features_list=peptide.extract_global_descriptors(sequence)
             peptide_features=np.array(peptide_features_list)
@@ -495,8 +495,8 @@ def extract_true_features(encoding_bools_dict, uniprot_dict, SMILES, UNIProt_ID)
                 array=np.array(topological_list)
             if encoding_name=='morganf':
                 array=np.array(morgan_list)
-            if encoding_name=='macckeysf':
-                array=np.array(macckeys_list)
+            if encoding_name=='maccskeysf':
+                array=np.array(maccskeys_list)
             if encoding_name=='peptidef':
                 array=np.array(peptide_list)
             if encoding_name=='windowbasedf':
@@ -526,7 +526,7 @@ def extract_all_features(datafile, encoding_names):
     ligand_list=[]
     topological_list=[]
     morgan_list=[]
-    macckeys_list=[]
+    maccskeys_list=[]
     peptide_list=[]
     windowbased_list=[]
     autocorrelation_list=[]
@@ -540,7 +540,7 @@ def extract_all_features(datafile, encoding_names):
         ligand_features=ligand.rdkit_descriptors()
         ligand_topological=ligand.topological_fingerprints()
         ligand_morgan=ligand.morgan_fingerprint()
-        ligand_macckeys=ligand.macckeys()
+        ligand_maccskeys=ligand.maccskeys()
         peptide_features_list=peptide.extract_global_descriptors(sequence)
         peptide_windowbased_list=peptide.compute_window_based_features(sequence,all_residue_descr)
         peptide_autocorrelation_list=peptide.compute_autocorrelation_features(all_residue_descr)
@@ -548,7 +548,7 @@ def extract_all_features(datafile, encoding_names):
         ligand_list.append(ligand_features)
         topological_list.append(ligand_topological)
         morgan_list.append(ligand_morgan)
-        macckeys_list.append(ligand_macckeys)
+        maccskeys_list.append(ligand_maccskeys)
         peptide_list.append(np.array(peptide_features_list))
         windowbased_list.append(np.array(peptide_windowbased_list))
         autocorrelation_list.append(np.array(peptide_autocorrelation_list))
@@ -560,8 +560,8 @@ def extract_all_features(datafile, encoding_names):
             array=np.array(topological_list)
         if encoding_name=='morganf':
             array=np.array(morgan_list)
-        if encoding_name=='macckeysf':
-            array=np.array(macckeys_list)
+        if encoding_name=='maccskeysf':
+            array=np.array(maccskeys_list)
         if encoding_name=='peptidef':
             array=np.array(peptide_list)
         if encoding_name=='windowbasedf':
@@ -579,7 +579,7 @@ def slicing_features(large_feature_array, n_features_list, bool_list):
     Parameters:
         large_feature_array (np.array): array of shape (n_samples, total_n_features) with all 
             possible small molecule encodings and protein encodings, in the following order: ligand features, topological fingerprints,
-            morgan fingerprints, macckeys, peptide features (for the protein as a whole), window-based features, and autocorrelation features.
+            morgan fingerprints, maccskeys, peptide features (for the protein as a whole), window-based features, and autocorrelation features.
         n_features_list (list): list of the number of features corresponding to each of the feature types described above, in the same order.
         bool_list (list): contains the booleans corresponding to each feature, in the same order.
     
@@ -649,8 +649,8 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
     for current_prep_name, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
         score_list_current_prep = data_prep_scores[current_prep_name]           #a list of the scores of this data prepping
         estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
-                                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2, verbose=0)
-        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-1, cv=5, scoring='neg_mean_absolute_error', verbose=3).mean()
+                                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-1, verbose=0)
+        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-1, cv=3, scoring='neg_mean_absolute_error', verbose=3).mean()
         mean_cv_score = -neg_mean_cv_score
         score_list_current_prep.append(mean_cv_score)
         if mean_cv_score < best_cv_score:        
@@ -737,7 +737,7 @@ def make_pca_plots(pca_scores):
     plt.show()
 
 def estimators_errors(encoding_bools, max_features=None, max_depth=None, min_samples_split=2, min_samples_leaf=1):
-    print('started making estimators graph')
+    print('started calculating n_estimators')
     uniprot_dict=extract_sequence("data/protein_info.csv")
     smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
     X = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
@@ -760,22 +760,10 @@ def estimators_errors(encoding_bools, max_features=None, max_depth=None, min_sam
         train_errors.append(train_error)
         validation_errors.append(validation_error)
     return train_errors, validation_errors, n_estimators_range
-# print(estimators_errors(encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
+# print(estimators_errors(encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'maccskeysf': False, 
 #                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}))
 
-def estimators_graph(n_estimators, train_errors,validation_errors):
-    plt.plot(n_estimators, train_errors, 'bo-', label='Train MAE')
-    plt.plot(n_estimators, validation_errors, 'ro-', label='Validation MAE')
-    plt.legend()
-    plt.title('The MAE for different values of n_estimators')
-    plt.xlabel('Value for n_estimators')
-    plt.ylabel('MAE score')
-    plt.ylim(0.5,3.0)
-    plt.show()
-estimators_graph(range(150,551,50),[0.9364852503923449, 0.9387822832720553, 0.9368893137739037, 0.9338982757980732, 
-                                    0.931374056099311, 0.9343564149344363, 0.9311238458740473, 0.9283287534314073, 0.9304546677103404],
-                [2.4266153572854803, 2.403839310114793, 2.3976645726907426, 2.3916775985694687, 2.396581512252472, 2.3990959471799833, 
-                 2.387312014475291, 2.3891048845890626, 2.3988525188348513])
+
 
 def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomized', scoring='neg_mean_absolute_error'):
     """Tunes the hyperparameters for the RF model using randomised search.
@@ -805,7 +793,7 @@ if tuning is True:
     errors_after_tuning = False
     starttime=time.time()
     print("started tuning")
-    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
+    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'maccskeysf': False, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
@@ -841,8 +829,8 @@ if run is True:
     starttime=time.time()
     print("started")
     bestscore=100
-    order_of_encodings = ['ligandf', 'topologicalf', 'morganf', 'macckeysf', 'peptidef', 'windowbasedf', 'autocorrelationf']
-    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
+    order_of_encodings = ['ligandf', 'topologicalf', 'morganf', 'maccskeysf', 'peptidef', 'windowbasedf', 'autocorrelationf']
+    encoding_bools = {'ligandf':False, 'topologicalf':True, 'morganf': True, 'maccskeysf': True, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     max_features=None
     max_depth=None
@@ -854,7 +842,7 @@ if run is True:
     lf_array,n_lf_features=data_dictionary['ligandf']
     tf_array,n_tf_features=data_dictionary['topologicalf']
     mo_array,n_mo_features=data_dictionary['morganf']
-    ma_array,n_ma_features=data_dictionary['macckeysf']
+    ma_array,n_ma_features=data_dictionary['maccskeysf']
     pf_array,n_pf_features=data_dictionary['peptidef']
     wb_array,n_wb_features=data_dictionary['windowbasedf']
     ac_array,n_ac_features=data_dictionary['autocorrelationf']
@@ -905,7 +893,7 @@ if run is True:
 
 if kaggle is True:
     starttime=time.time()
-    encoding_bools = {'ligandf': False, 'topologicalf': True, 'morganf': True, 'macckeysf': True, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    encoding_bools = {'ligandf': False, 'topologicalf': True, 'morganf': True, 'maccskeysf': True, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     scaling=False           #Determines whether scaling will be applied
     clipping=True           #Determines whether outliers will be clipped
     n_estimators=400        #Vul hier je hyperparameters in
@@ -971,7 +959,7 @@ if errors is True:
     starttime=time.time()
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
-    encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
+    encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'maccskeysf': False, 
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     X = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
     print("data array has been made")
@@ -1001,15 +989,15 @@ if tuning_clipping:
     print("started tuning clippings")
     uniprot_dict=extract_sequence("data/protein_info.csv")  
     smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
-    encoding_bools_list = [{'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
+    encoding_bools_list = [{'ligandf':False, 'topologicalf':True, 'morganf': True, 'maccskeysf': False, 
                     'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}, 
-                    {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
+                    {'ligandf':False, 'topologicalf':True, 'morganf': True, 'maccskeysf': True, 
                     'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False},
-                    {'ligandf':False, 'topologicalf':False, 'morganf': True, 'macckeysf': True, 
+                    {'ligandf':False, 'topologicalf':False, 'morganf': True, 'maccskeysf': True, 
                     'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False},
-                    {'ligandf':False, 'topologicalf':False, 'morganf': True, 'macckeysf': False, 
+                    {'ligandf':False, 'topologicalf':False, 'morganf': True, 'maccskeysf': False, 
                     'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}]
-    n_estimators=400        #Vul hier je hyperparameters in
+    n_estimators=300
     max_depth=None
     min_samples_split=2
     min_samples_leaf=1
@@ -1028,11 +1016,11 @@ if tuning_clipping:
         for clip in list(clipped_dict.keys()):
             clip_scores[clip]=[]
         score, best_clip, clip_scores = data_prep_cv(clipped_dict, y_train, clip_scores, n_estimators, max_depth, 
-                                                        min_samples_split, min_samples_leaf, max_features)   
+                                                        min_samples_split, min_samples_leaf, max_features)  
+        print(f"clip_scores: {clip_scores}") 
         if score < bestscore:
             bestscore = score
             bestclip = best_clip
-
     clip_averages = {}
     for clip, scores in clip_scores.items():
         clip_averages[clip] = np.mean(scores)
@@ -1040,4 +1028,5 @@ if tuning_clipping:
     index = list(clip_averages.values()).index(min_average)
     min_clip_name = list(clip_averages.keys())[index]
     print(f"this took {(time.time()-starttime)/60} minutes")
+    print(f'the averages for all clippings were {clip_averages}')
     print(f"the best clipping score is {bestscore} with clip: {bestclip}")
