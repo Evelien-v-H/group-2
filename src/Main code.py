@@ -1,8 +1,8 @@
 run=False
 kaggle=False
 tuning=False
-errors=True
-many_errors=False
+errors=False
+tuning_clipping=False
 
 import pandas as pd
 import numpy as np
@@ -412,8 +412,9 @@ def calculate_errors(X_train, y_train_true, X_validation, y_validation_true,
     if params is not None:
         print(f"and parameters: {params}")
     print(f'the MAE on the train set is: {mae_train} and on the validation set: {mae_validation}')
+    return mae_train, mae_validation
 
-def train_model(X,y,n_estimators=100,  criterion='absolute_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+def train_model(X,y,n_estimators=100,  criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
                 min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
                 oob_score=False, n_jobs=-1, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None):
     """Trains the model
@@ -649,7 +650,7 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
         score_list_current_prep = data_prep_scores[current_prep_name]           #a list of the scores of this data prepping
         estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
                                           min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2, verbose=0)
-        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-2, cv=5, scoring='neg_mean_absolute_error').mean()
+        neg_mean_cv_score = cross_val_score(estimator, current_X_train, affinity, n_jobs=-1, cv=5, scoring='neg_mean_absolute_error', verbose=3).mean()
         mean_cv_score = -neg_mean_cv_score
         score_list_current_prep.append(mean_cv_score)
         if mean_cv_score < best_cv_score:        
@@ -735,6 +736,47 @@ def make_pca_plots(pca_scores):
     ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
     plt.show()
 
+def estimators_errors(encoding_bools, max_features=None, max_depth=None, min_samples_split=2, min_samples_leaf=1):
+    print('started making estimators graph')
+    uniprot_dict=extract_sequence("data/protein_info.csv")
+    smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
+    X = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
+    training_set, validation_set = train_validation_split(X,y_train,0.8)
+    X_train, y_train = training_set
+    X_validation, y_validation_true = validation_set
+    print(f"data has been splitted into two sets")
+    X_train_clipped, clip = clipping_outliers_train(X_train)
+    X_validation_clipped = clipping_outliers_test(X_validation, clip)
+    train_errors = []
+    validation_errors = []
+    n_estimators_range=range(150,551,50)
+    for n_estimators in n_estimators_range:
+        rf_model = train_model(X_train_clipped, y_train, criterion='squared_error',n_estimators=n_estimators, max_depth=max_depth, 
+                        min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-1)
+        print(f"model has been trained with n_estimators {n_estimators}")
+        train_error, validation_error = calculate_errors(X_train=X_train_clipped, y_train_true=y_train, X_validation=X_validation_clipped, y_validation_true=y_validation_true,
+                     encoding_bools=encoding_bools, rf_model=rf_model, n_estimators=n_estimators,
+                      max_depth=max_depth, min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split, max_features=max_features)
+        train_errors.append(train_error)
+        validation_errors.append(validation_error)
+    return train_errors, validation_errors, n_estimators_range
+# print(estimators_errors(encoding_bools={'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
+#                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}))
+
+def estimators_graph(n_estimators, train_errors,validation_errors):
+    plt.plot(n_estimators, train_errors, 'bo-', label='Train MAE')
+    plt.plot(n_estimators, validation_errors, 'ro-', label='Validation MAE')
+    plt.legend()
+    plt.title('The MAE for different values of n_estimators')
+    plt.xlabel('Value for n_estimators')
+    plt.ylabel('MAE score')
+    plt.ylim(0.5,3.0)
+    plt.show()
+estimators_graph(range(150,551,50),[0.9364852503923449, 0.9387822832720553, 0.9368893137739037, 0.9338982757980732, 
+                                    0.931374056099311, 0.9343564149344363, 0.9311238458740473, 0.9283287534314073, 0.9304546677103404],
+                [2.4266153572854803, 2.403839310114793, 2.3976645726907426, 2.3916775985694687, 2.396581512252472, 2.3990959471799833, 
+                 2.387312014475291, 2.3891048845890626, 2.3988525188348513])
+
 def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomized', scoring='neg_mean_absolute_error'):
     """Tunes the hyperparameters for the RF model using randomised search.
     Input:  
@@ -750,7 +792,7 @@ def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomiz
     if search_type=='grid':
         estimator = GridSearchCV(model, param_grids, n_jobs=-1, refit=True, cv=cv_fold, verbose=3, scoring=scoring)
     elif search_type=='randomized':
-        estimator = RandomizedSearchCV(model, param_grids, n_jobs=-2, refit=True, cv=cv_fold, n_iter=n_iter, verbose=2, scoring=scoring)
+        estimator = RandomizedSearchCV(model, param_grids, n_jobs=-1, refit=True, cv=cv_fold, n_iter=n_iter, verbose=2, scoring=scoring)
     estimator.fit(X,y)
     best_estimator = estimator.best_estimator_
     best_params = estimator.best_params_
@@ -828,8 +870,8 @@ if run is True:
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
 
     data_prep_scores = {}                               #for each data prepping strategy, will include a list of all mae scores that used this prepping
-    for data_prep in list(data_prep_dict.keys()):
-        data_prep_scores[data_prep]=[]
+    for clip in list(data_prep_dict.keys()):
+        data_prep_scores[clip]=[]
 
     all_scores = []
     for encoding_bools in valid_tf_combinations:        #encoding_bools is a list of True and False
@@ -846,8 +888,8 @@ if run is True:
         print(f'{encoding_bools},{score}')
    
     prep_averages = {}
-    for data_prep, scores in data_prep_scores.items():
-        prep_averages[data_prep] = np.mean(scores)
+    for clip, scores in data_prep_scores.items():
+        prep_averages[clip] = np.mean(scores)
     min_average = min(prep_averages.values())
     index = list(prep_averages.values()).index(min_average)
     min_prep_name = list(prep_averages.keys())[index]
@@ -861,9 +903,9 @@ if run is True:
 
 
 
-if kaggle==True:
+if kaggle is True:
     starttime=time.time()
-    encoding_bools = {'ligandf': False, 'topologicalf': True, 'morganf': True, 'macckeysf': False, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    encoding_bools = {'ligandf': False, 'topologicalf': True, 'morganf': True, 'macckeysf': True, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     scaling=False           #Determines whether scaling will be applied
     clipping=True           #Determines whether outliers will be clipped
     n_estimators=400        #Vul hier je hyperparameters in
@@ -884,18 +926,17 @@ if kaggle==True:
         print("trainingset is scaled")
         X_test_clipped_scaled=data_scaling(scaler,X_test)
         print("testset is scaled")
-        model=train_model(X_scaled,y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
-                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
+        model=train_model(X_scaled, y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-1)
         print("model is trained")
         kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
 
-    if clipping is True:
+    if clipping and not scaling:
         X_train,clean=clipping_outliers_train(X_train)
         X_validation=clipping_outliers_test(X_test,clean)
-        print("sets are cleaned")
-        model=train_model(X_train,y_train, n_estimators=100, criterion='squared_error', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
-                min_weight_fraction_leaf=0.0, max_features=1.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, 
-                oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, ccp_alpha=0.0, max_samples=None, monotonic_cst=None)
+        print("sets are clipped")
+        model=train_model(X_train, y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-1, verbose=3)
         print("model is trained")
         kaggle_submission(X_validation,model,"docs/Kaggle_submission.csv")
 
@@ -909,14 +950,14 @@ if kaggle==True:
         print("trainingset is scaled")
         X_test_clipped_scaled=data_scaling(scaler,X_test_clipped)
         print("testset is scaled")
-        model=train_model(X_clipped_scaled,y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
-                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
+        model=train_model(X_clipped_scaled, y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                          min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-1)
         print("model is trained")
         kaggle_submission(X_test_clipped_scaled,model,"docs/Kaggle_submission.csv")
 
     if not clipping and not scaling:
-        model=train_model(X_train,y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
-                    min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
+        model=train_model(X_train, y_train, n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, 
+                    min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-1)
         print("model is trained")
         kaggle_submission(X_test,model,"docs/Kaggle_submission.csv") 
 
@@ -941,51 +982,62 @@ if errors is True:
     X_train_clipped, clip = clipping_outliers_train(X_train)
     X_validation_clipped = clipping_outliers_test(X_validation, clip)
     print(f"data has been clipped")
-    n_estimators = 400
+    n_estimators = 300
     max_depth = None
     min_samples_split = 2
     min_samples_leaf = 1
     max_features = None
     rf_model = train_model(X_train, y_train, n_estimators=n_estimators, max_depth=max_depth, 
-                        min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-2)
+                        min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features, n_jobs=-1)
     print(f"model has been trained, time passed: {(time.time()-starttime)/60}")
     calculate_errors(X_train=X_train, y_train_true=y_train, X_validation=X_validation, y_validation_true=y_validation_true,
                      encoding_bools=encoding_bools, rf_model=rf_model, n_estimators=n_estimators,
                       max_depth=max_depth, min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split, max_features=max_features)
     print(f"total time: {(time.time()-starttime)/60}")
 
-
-if many_errors is True:
-    n_estimators = 400
-    max_depth = None
-    min_samples_split = 2
-    min_samples_leaf = 1
-    max_features = None
-    options_to_try = [[False, True, True, False, True, True, True], [True, True, False, False, False, True, False],[False, True, False, True, True, False, True], 
-                    [True, True, True, False, True, False, False], [True, True, False, True, False, True, False], [True, True, False, True, True, False, False],
-                    [True, True, False, False, True, True, True], [False, True, False, True, True, True, False],[True,False,True,False,True,True,False], 
-                    [False,True,True,False,False,False,True],[True,True,True,False,True,True,True],[False,True,False,False,False,True,False],
-                    [True,True,True,False,True,False,True],[False,False,True,False,True,False,False],[True,True,True,True,False,True,False]]
-    encoding_bools={'ligandf': None, 'topologicalf': None, 'morganf': None, 'macckeysf': None, 'peptidef': None, 'windowbasedf': None, 'autocorrelationf': None}
-    print("started many_errors")
+if tuning_clipping:
     starttime=time.time()
-
+    bestscore=100
+    print("started tuning clippings")
     uniprot_dict=extract_sequence("data/protein_info.csv")  
-    data_dictionary,affinity=extract_all_features("data/train.csv",encoding_names=list(encoding_bools.keys()))
-    lf_array,n_lf_features=data_dictionary['ligandf']
-    tf_array,n_tf_features=data_dictionary['topologicalf']
-    mo_array,n_mo_features=data_dictionary['morganf']
-    ma_array,n_ma_features=data_dictionary['macckeysf']
-    pf_array,n_pf_features=data_dictionary['peptidef']
-    wb_array,n_wb_features=data_dictionary['windowbasedf']
-    ac_array,n_ac_features=data_dictionary['autocorrelationf']
+    smiles_train,uniprot_ids_train,y_train=data_to_SMILES_UNIProt_ID("data/train.csv")
+    encoding_bools_list = [{'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': False, 
+                    'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}, 
+                    {'ligandf':False, 'topologicalf':True, 'morganf': True, 'macckeysf': True, 
+                    'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False},
+                    {'ligandf':False, 'topologicalf':False, 'morganf': True, 'macckeysf': True, 
+                    'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False},
+                    {'ligandf':False, 'topologicalf':False, 'morganf': True, 'macckeysf': False, 
+                    'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}]
+    n_estimators=400        #Vul hier je hyperparameters in
+    max_depth=None
+    min_samples_split=2
+    min_samples_leaf=1
+    max_features=None
+    for encoding_bools in encoding_bools_list:
+        X_train = extract_true_features(encoding_bools, uniprot_dict, smiles_train, uniprot_ids_train)
+        print(f'data array has been made, this took {(time.time()-starttime)/60} minutes')
+        X_train, mvl, irl = data_cleaning_train(X_train)
+        print(f'data has been cleaned')
+        clipped_dict={}
+        clipped_dict['no clipping']=X_train
+        for clip_size in range(1,6):
+            X_train_clipped,clean=clipping_outliers_train(X_train, clip_size, 100-clip_size)
+            clipped_dict[clip_size]=X_train_clipped
+        clip_scores = {}
+        for clip in list(clipped_dict.keys()):
+            clip_scores[clip]=[]
+        score, best_clip, clip_scores = data_prep_cv(clipped_dict, y_train, clip_scores, n_estimators, max_depth, 
+                                                        min_samples_split, min_samples_leaf, max_features)   
+        if score < bestscore:
+            bestscore = score
+            bestclip = best_clip
 
-    all_features=np.concatenate([lf_array,tf_array,mo_array,ma_array,pf_array,wb_array,ac_array],axis=1)
-    n_features_list=[n_lf_features,n_tf_features,n_mo_features,n_ma_features,n_pf_features,n_wb_features,n_ac_features]
-    print(f"large array has been made, time passed: {(time.time() - starttime)/60} minutes")
-    for encoding_bools in valid_tf_combinations:
-        included_encodings = []                         #keeps track of the encodings included in this iteration
-        for i in range(len(encoding_bools)):
-            if encoding_bools[i]:
-                included_encodings.append(order_of_encodings[i])
-        print(f'Encodings: {included_encodings}')
+    clip_averages = {}
+    for clip, scores in clip_scores.items():
+        clip_averages[clip] = np.mean(scores)
+    min_average = min(clip_averages.values())
+    index = list(clip_averages.values()).index(min_average)
+    min_clip_name = list(clip_averages.keys())[index]
+    print(f"this took {(time.time()-starttime)/60} minutes")
+    print(f"the best clipping score is {bestscore} with clip: {bestclip}")
