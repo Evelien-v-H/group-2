@@ -1,5 +1,5 @@
 run=False
-kaggle=False
+kaggle=True
 tuning=False
 errors=False
 tuning_clipping=False
@@ -846,7 +846,7 @@ if run is True:
                       'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     max_features=None
     max_depth=None
-    n_estimators=100
+    n_estimators=600
     min_samples_leaf=1
     min_samples_split=2
 
@@ -864,7 +864,7 @@ if run is True:
     print(f"large array has been made, time passed: {(time.time() - starttime)/60} minutes")
 
     data_prep_dict=make_data_prep_dict(all_features, include_only_cleaning=True, include_scaling=False, 
-                                       include_clipping=True, include_PCA=False)                    #specify here what data preps you want included in the comparison
+                                       include_clipping=False, include_PCA=False)                    #specify here what data preps you want included in the comparison
     
     true_false_combinations = create_tf_combinations(len(n_features_list), [])      #generates lists of True and False in all possible combinations with length of the number of encodings, here 7 (4 ligand + 3 protein)
     valid_tf_combinations = verify_tf_combinations(true_false_combinations)         #only returns lists that contain at least one True value for ligand encoding and one True value for protein encoding
@@ -905,10 +905,10 @@ if run is True:
 
 if kaggle is True:
     starttime=time.time()
-    encoding_bools = {'ligandf': False, 'topologicalf': True, 'morganf': True, 'macckeysf': True, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    encoding_bools = {'ligandf': False, 'topologicalf': True, 'morganf': True, 'macckeysf': False, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     scaling=False           #Determines whether scaling will be applied
-    clipping=True           #Determines whether outliers will be clipped
-    n_estimators=400        #Vul hier je hyperparameters in
+    clipping=False           #Determines whether outliers will be clipped
+    n_estimators=600        #Vul hier je hyperparameters in
     max_depth=None
     min_samples_split=2
     min_samples_leaf=1
