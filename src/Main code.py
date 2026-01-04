@@ -326,20 +326,6 @@ def data_cleaning_test(data,mean_value_coloms, irrelevant_colums):
     return data
 
 
-def check_matrix(X):
-    """CHecks if there are values in a matrix an random forest can crash on. This is an function for ourselves to control this if we get an error
-    
-    input matrix
-    
-    There is no output"""
-    print(X)
-    print('a')
-    print("Heeft NaN:", np.isnan(X).any())
-    print("Heeft +inf:", np.isinf(X).any())
-    print("Heeft -inf:", np.isneginf(X).any())
-    print("Max waarde:", np.nanmax(X))
-    print("Min waarde:", np.nanmin(X))
-
 def clipping_outliers_train(matrix,percentile_low=1,percentile_high=99):
     """This function changes outliers to the highest possible not outlier value, percentile_low, the smallest percentile,percentile_high, highest percentile both must be integers
     

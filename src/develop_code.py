@@ -1,3 +1,34 @@
+def train_validation_split(X_train, y_train, percentage):
+    """This function splits the data randomly into training data set and a validation
+    data set. These training and validation set are returned as a tuple of 2 tuples
+    as (X_training,y_training),(X_validation, y_validation). It splits the the data in
+    two with the percentage to determine how big training data set is. Percentage is
+    a float between 1 and 0."""
+
+    #calculates trainingsize with percentage
+    n_samples, n_features= X_train.shape
+    training_size=int(percentage*n_samples)
+
+    #permutation makes a random order so data
+    #is split randomly.
+    permutation=np.random.permutation(n_samples)
+
+    #shuffles data with permutation
+    X_shuffled=X_train[permutation]
+    y_shuffled=y_train[permutation]
+
+    #makes the training and validation sets
+    X_training=X_shuffled[:training_size]
+    X_validation=X_shuffled[training_size:]
+    y_training=y_shuffled[:training_size]
+    y_validation=y_shuffled[training_size:]
+
+    training=(X_training,y_training)
+    validation=(X_validation,y_validation)
+
+    return training,validation
+
+
 #file for all code we aren't actively using
 import numpy as np
 import matplotlib.pyplot as plt
