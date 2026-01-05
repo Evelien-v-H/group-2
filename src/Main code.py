@@ -879,10 +879,10 @@ if run is True:
 
 if kaggle is True:
     starttime=time.time()
-    encoding_bools = {'ligandf': False, 'topologicalf': True, 'morganf': True, 'macckeysf': False, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
+    encoding_bools = {'ligandf': False, 'topologicalf': False, 'morganf': True, 'maccskeysf': True, 'peptidef': True, 'windowbasedf': False, 'autocorrelationf': False}
     scaling=False           #Determines whether scaling will be applied
-    clipping=False           #Determines whether outliers will be clipped
-    n_estimators=600        #Vul hier je hyperparameters in
+    clipping=True       #0,01 clipping    #Determines whether outliers will be clipped 
+    n_estimators=400        #Vul hier je hyperparameters in
     max_depth=None
     min_samples_split=2
     min_samples_leaf=1
