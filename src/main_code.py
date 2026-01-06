@@ -344,17 +344,19 @@ class protein:
         Returns:
         -------------
         autocorrelation_features: list
-            An list with the autocorrelation encoding
+            A list of length 3*n_descriptors with the autocorrelation encoding for this protein
+        
         """
         n_residues, n_descr = np.shape(all_residue_descr)
         autocorrelation_features = []
         for descr in range(n_descr):
             current_descr_values = all_residue_descr[:, descr]
-            descr_scaled = current_descr_values - np.mean(current_descr_values)
+            descr_scaled = current_descr_values - np.mean(current_descr_values)                 #scale the descriptors to ensure correct correlation computation
             correlation = np.correlate(descr_scaled, descr_scaled, mode='full')
+            zero_lag_ind = n_descr - 1                                                #np.correlate() returns an array of size 2*n_descr-1 with the zero-lag value in the middle
             for lag in [1,4,10]:
-                autocorrelation_features.append(correlation[lag])
-        return autocorrelation_features  #a list of all autocorrelation_based features, length is 3*n_descr
+                autocorrelation_features.append(correlation[zero_lag_ind+lag])
+        return autocorrelation_features                     #a list of all autocorrelation_based features, length is 3*n_descr
 
 def is_number(val):
     """Checks if the input a number is (used for datacleaning)"""
