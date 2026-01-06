@@ -381,13 +381,34 @@ def estimators_graph():
     n_estimators=range(150,551,50)
     train_errors=[0.9364852503923449, 0.9387822832720553, 0.9368893137739037, 0.9338982757980732, 0.931374056099311, 0.9343564149344363, 0.9311238458740473, 0.9283287534314073, 0.9304546677103404]
     validation_errors=[2.4266153572854803, 2.403839310114793, 2.3976645726907426, 2.3916775985694687, 2.396581512252472, 2.3990959471799833, 2.387312014475291, 2.3891048845890626, 2.3988525188348513]
+    f, (ax1, ax2) = plt.subplots(2,1,sharex=True,height_ratios=[15,1])
     # plt.plot(n_estimators, train_errors, 'bo-', label='Train MAE')
-    plt.plot(n_estimators, validation_errors, 'ro-', label='Validation MAE')
+    ax1.plot(n_estimators, validation_errors, 'ro-', label='Validation MAE')
     # plt.legend()
-    plt.title('The validation error for different values of n_estimators')
-    plt.xlabel('Value for n_estimators')
-    plt.ylabel('MAE score on validation set')
-    # plt.ylim(0.5,3)
-    plt.grid()
+    f.suptitle('The validation error for different values of n_estimators')
+    f.subplots_adjust(hspace=0.1)
+    f.supxlabel('Value for n_estimators')
+    f.supylabel('MAE score on validation set')
+    ax1.set_ylim(2.385,2.430)
+    ax2.set_ylim(0,0.01)
+    ax1.spines['bottom'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    ax1.xaxis.tick_top()
+    ax1.tick_params(labeltop=False)
+    ax2.xaxis.tick_bottom()
+    ax1.grid()
+    ax2.grid()
+    ax2ygridlines = ax2.get_ygridlines()
+    ax2ygridlines[-1].set_visible(False)
     plt.show()
-estimators_graph()
+
+def prepping_graph():
+    data={'Scaled':0.4785018435920147,'Cleaned':0.47583234137174646,'Cleaned+\nscaled': 0.4784814897780814, 
+          'Scaled+\npca66':0.3201183220520327, 'Scaled+\npca80':0.34864618071310116, 'Scaled+\npca95': 0.365840455772483,
+          'Cleaned+\nscaled+\npca66':0.320365179686796, 'Cleaned+\nscaled+\npca80':0.3511814161572563, 'Cleaned+\nscaled+\npca95':0.3511814161572563}
+    plt.xlabel('Preproccessing steps')
+    plt.ylabel('R^2')
+    plt.title('Error for different preprocessing steps',fontsize=18)
+    plt.bar(list(data.keys()), list(data.values()))
+    plt.show()
+prepping_graph()
