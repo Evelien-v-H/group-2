@@ -179,9 +179,10 @@ def prepping_graph():
     data={'Scaled':0.4785018435920147,'Cleaned':0.47583234137174646,'Cleaned+\nscaled': 0.4784814897780814, 
           'Scaled+\npca66':0.3201183220520327, 'Scaled+\npca80':0.34864618071310116, 'Scaled+\npca95': 0.365840455772483,
           'Cleaned+\nscaled+\npca66':0.320365179686796, 'Cleaned+\nscaled+\npca80':0.3511814161572563, 'Cleaned+\nscaled+\npca95':0.3511814161572563}
-    plt.xlabel('Preproccessing steps')
-    plt.ylabel('R^2')
+    plt.xlabel('Preproccessing steps',fontsize=14)
+    plt.ylabel('R^2',fontsize=14)
     plt.title('Error for different preprocessing steps',fontsize=18)
+    plt.xticks(fontsize=13)
     plt.bar(list(data.keys()), list(data.values()))
     plt.show()
 prepping_graph()
