@@ -1,5 +1,3 @@
-#Dit is het definitieve document, hier mag alleen code in die met pep 8 gestructureerd is en die in het definitieve document moet komen
-
 import pandas as pd
 import numpy as np
 
@@ -409,7 +407,7 @@ def verify_tf_combinations(tf_combinations):
     return valid_tf_combinations
 
 def extract_all_features(datafile, encoding_names):
-    """This function makes a dictionary with all the different possible datasets. 
+    """This function makes a dictionary with all the different possible datasets. This function should only be used in combination with slicing_features().
 
     Parameters:
     ----------------
@@ -566,7 +564,7 @@ def extract_true_features(encoding_bools_dict, uniprot_dict, SMILES, UNIProt_ID)
     return X
 
 def slicing_features(large_feature_array, n_features_list, bool_list):
-    """Slices the matrix with all possible encodings into the right combination of encodings
+    """Slices the matrix with all possible encodings into the right combination of encodings.
     Parameters:
     ------------
     large_feature_array: 2D (NumPy) array
@@ -829,9 +827,10 @@ def fit_PCA(X, n_components=None):
     Returns:
     ---------------
     X_scores: 2D (NumPy) array
-        array of shape (n_samples, n_components
+        array of shape (n_samples, n_components)
 
-    variance_per_pca:?
+    variance_per_pc: list
+        list of ratio of variance explained per principal component
     """
     pca = sklearn.decomposition.PCA(n_components=n_components)
     X_scores = pca.fit_transform(X)
@@ -956,8 +955,12 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
         outliers included or excluded.(made in make_data_prep_dict)
 
     affinity: (NumPy) array
+        binding affinity per sample
 
-    data_prep_scores:?
+    data_prep_scores: dict
+        dictionary with as keys the same strings as data_prep_dict and as value a list of the cv scores achieved for that
+        data prepping method. For each call of data_prep_cv, one value is appended to the end of each of the lists. Is used 
+        to keep track of the overall score of each prepping method.
 
     n_estimators: int
         n_estimators are the number of trees used
@@ -974,6 +977,18 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
     max_features: str
         max_features are how many feature are used to make a tree. The possible strings are sqrt, log2 and None
     
+    Returns:
+    ------------
+    best_dataprep: str
+        key from data_prep_dict whose X_train array resulted in the lowest MAE during cross validation.
+
+    best_cv_score: float
+        mean squared error of the best_dataprep
+
+    data_prep_scores: dict
+        updated data_prep_scores, now having appended cv scores from the most recent call of this function to the
+        lists in the values.
+
     """
     best_cv_score = 100
     for current_prep_name, current_X_train in data_prep_dict.items():                            #loops over the different data sources in the dictionary, data_source is the index of the current iteration
@@ -987,7 +1002,7 @@ def data_prep_cv(data_prep_dict,affinity, data_prep_scores, n_estimators=100, ma
             best_cv_score = mean_cv_score
             best_dataprep = current_prep_name          #keeps track of the best data prep thus far
         data_prep_scores[current_prep_name] = score_list_current_prep
-    return best_cv_score, best_dataprep, data_prep_scores
+    return best_dataprep, best_cv_score, data_prep_scores
 
 def make_data_prep_dict(X_train_raw,include_only_cleaning,include_scaling=True,include_clipping=True,include_PCA='clipping'):
     """applies different data preppings to X_train_raw, depending on what boolean parameters have been set to true.
@@ -1094,3 +1109,21 @@ def hyperparams_cv(X,y,param_grids, n_iter=100, cv_fold=5, search_type='randomiz
     best_params = estimator.best_params_
     best_score = estimator.best_score_
     return best_params, best_score, best_estimator
+
+
+def calculate_errors(X_train, y_train_true, X_validation, y_validation_true,
+                     encoding_bools, rf_model, n_estimators=None, max_depth=None, 
+                     min_samples_split=None, min_samples_leaf=None, max_features=None, params=None):
+    y_train_pred = RF_predict(rf_model, X_train)        #the predicted values of y_train
+    y_validation_pred = RF_predict(rf_model, X_validation)    #the predicted values of y_validation
+    mae_train = mean_absolute_error(y_train_true, y_train_pred)
+    mae_validation = mean_absolute_error(y_validation_true, y_validation_pred)
+    print(f'For encoding_bools: {encoding_bools}')
+    if params is None:
+        print(f"""and parameters: n_estimators: {n_estimators}, max_depth: {max_depth}, 
+          min_samples_split: {min_samples_split}, min_samples_leaf: {min_samples_leaf}, max_features: {max_features}""")
+    if params is not None:
+        print(f"and parameters: {params}")
+    print(f'the MAE on the train set is: {mae_train} and on the validation set: {mae_validation}')
+    return mae_train, mae_validation
+
