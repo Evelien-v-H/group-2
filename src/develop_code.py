@@ -28,6 +28,33 @@ def train_validation_split(X_train, y_train, percentage):
 
     return training,validation
 
+def kaggle_submission(X_test,model,filename):
+    affinity_array=RF_predict(model, X_test)
+    f=open(filename,'w')
+    print(filename+" is made")
+    f.write("ID,affinity_score")
+    b=0
+    for a in affinity_array:
+        f.write("\n"+str(b)+","+ str(a))
+        b+=1
+    f.close()
+    return
+
+
+def make_pca_plots(pca_scores):
+    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
+    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space.
+    """
+    fig, (ax1,ax2,ax3) = plt.subplots(3)
+    fig.suptitle('Principal component plots on cleaned and scaled training data')
+    ax1.scatter(pca_scores[:,0],pca_scores[:,1])
+    ax1.set(xlabel='First PC explained variance',ylabel='Second PC explained variance')
+    ax2.scatter(pca_scores[:,0],pca_scores[:,2])
+    ax2.set(xlabel='First PC explained variance',ylabel='Third PC explained variance')
+    ax3.scatter(pca_scores[:,1],pca_scores[:,2])
+    ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
+    plt.show()
+
 
 #file for all code we aren't actively using
 import numpy as np
