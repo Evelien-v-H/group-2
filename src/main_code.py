@@ -364,7 +364,7 @@ def is_number(val):
     except (ValueError, TypeError):
         return False
 
-def data_cleaning_train(data):
+def data_cleaning_train(data, usefull_colom_percentage=20):
     """This function is used for datacleaning
     
     Cleans the data as it removes coloms without floats or integer. It replaces empty values or strings in features with the mean of 
@@ -375,6 +375,10 @@ def data_cleaning_train(data):
     Parameters:
     --------------
     data: 2D (NumPy) array
+
+    usefull_colom_percentage: int
+        This is the percentage how much of an feature needs to be integers or floats. If an feature has less values, it deletes the feature.
+        This percentage needs to be between 1-100
     
     Returns:
     --------------
@@ -393,18 +397,20 @@ def data_cleaning_train(data):
         If the value of the datapoint is to big to use in an random forest (it is bigger than np.float32). These problems need to
         be solved manually.
     """
+    n_samples,n_features=np.shape(data)
+    minimal_length_colom=(usefull_colom_percentage*n_samples)/100  
     irrelevant_colums=[]
     mean_value_coloms=[]
     #This functions cleans colom after colom, this results in a quite complex for-loop. The first for-loop selects the colom, 
     #the second for-loop selects the row and makes the mean value list and irrelevant colom list. The third for-loop selects the row
     #and checks if the datapoint needs to be cleaned
-    for i in range(data.shape[1]):  
+    for i in range(data.shape[1]):
         values_colom=[]
         for j in range(data.shape[0]):
             if is_number(data[j,i]) is True:
                 values_colom.append(float(data[j,i]))
 
-        if len(values_colom)!=0:
+        if len(values_colom)>minimal_length_colom:
             mean_value=np.mean(values_colom)
             mean_value_coloms.append(mean_value)
                     
