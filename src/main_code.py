@@ -104,7 +104,7 @@ class small_molecule:
         Returns the morgan fingerprint of the molecule
 
     maccskeys()
-        Returns the macc keys
+        Returns the MACCS-keys
     """
     def __init__(self,SMILES):
         """
@@ -117,7 +117,7 @@ class small_molecule:
 
 
     def rdkit_descriptors(self):
-        """This function returns an array with all sorts of descriptors gotten from rdkit
+        """This function returns an array with all sorts of physiochemical descriptors gotten from rdkit
         
         Returns
         -----------
@@ -138,7 +138,7 @@ class small_molecule:
         return array
 
     def topological_fingerprints(self):
-        """This function gets the topological fingerprints of an molecule
+        """This function gets the topological fingerprints of a molecule
         
         Returns:
         ----------
@@ -177,7 +177,7 @@ class small_molecule:
         return array
     
     def maccskeys(self):
-        """This function gets the MACCS-keys of an molecule
+        """This function gets the MACCS-keys of a molecule
         
         Returns
         -----------
