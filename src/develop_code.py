@@ -32,6 +32,7 @@ def train_validation_split(X_train, y_train, percentage):
     return training,validation
 
 def kaggle_submission(X_test,model,filename):
+    """This function makes the document needed for the kaggle submissions"""
     affinity_array=RF_predict(model, X_test)
     f=open(filename,'w')
     print(filename+" is made")
