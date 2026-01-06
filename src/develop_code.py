@@ -1,3 +1,6 @@
+import matplotlib as plt
+import numpy
+
 def train_validation_split(X_train, y_train, percentage):
     """This function splits the data randomly into training data set and a validation
     data set. These training and validation set are returned as a tuple of 2 tuples
@@ -28,298 +31,51 @@ def train_validation_split(X_train, y_train, percentage):
 
     return training,validation
 
+def kaggle_submission(X_test,model,filename):
+    """This function makes the document needed for the kaggle submissions"""
+    affinity_array=RF_predict(model, X_test)
+    f=open(filename,'w')
+    print(filename+" is made")
+    f.write("ID,affinity_score")
+    b=0
+    for a in affinity_array:
+        f.write("\n"+str(b)+","+ str(a))
+        b+=1
+    f.close()
+    return
 
-#file for all code we aren't actively using
-import numpy as np
-import matplotlib.pyplot as plt
 
-
-def combining_all_features(dictionary, affinity, ligandf=True, topological=True, morgan=True, 
-                           macckeys=True, peptidef=True, windowbased=True, autocorrelation=True):
-    """This functions makes an matrix with the descriptors from the ligands and proteins in the file
-    
-    Input: dictionary made in extract_all_features
-    
-    Output: matrix (n_samples*n_features) and affinity (np.array of length n_samples)
+def make_pca_plots(pca_scores):
+    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
+    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space.
     """
-    if ligandf==True:
-        lf=dictionary['ligandf']
-    if topological==True:
-        tf=dictionary['topologicalf']
-    if morgan==True:
-        mo=dictionary['morganf']
-    if macckeys==True:
-        ma=dictionary['macckeysf']
-    if peptidef==True:
-        pf=dictionary['peptidef']
-    if windowbased==True:
-        wb=dictionary['windowbasedf']
-    if autocorrelation==True:
-        ac=dictionary['autocorrelationf']
+    fig, (ax1,ax2,ax3) = plt.subplots(3)
+    fig.suptitle('Principal component plots on cleaned and scaled training data')
+    ax1.scatter(pca_scores[:,0],pca_scores[:,1])
+    ax1.set(xlabel='First PC explained variance',ylabel='Second PC explained variance')
+    ax2.scatter(pca_scores[:,0],pca_scores[:,2])
+    ax2.set(xlabel='First PC explained variance',ylabel='Third PC explained variance')
+    ax3.scatter(pca_scores[:,1],pca_scores[:,2])
+    ax3.set(xlabel='Second PC explained variance',ylabel='Third PC explained variance')
+    plt.show()
 
+def make_pca_plots(pca_scores, y_train,cmap):
+    """makes three PCA-plots: first vs second PC, first vs third PC, and second vs third PC. 
+    Input parameter: pca_scores (np.array): the data transformed onto the new PCA feature space."""
+    fig, (ax1,ax2,ax3) = plt.subplots(3)
+    fig.tight_layout()
+    print(f'The shape of pca_scores[:,0] is {np.shape(pca_scores[:,0])}')
+    fig.suptitle('Principal component plots on cleaned and scaled training data')
+    vmin = np.percentile(y_train,1)
+    vmax = np.percentile(y_train,99)
+    ax1.scatter(pca_scores[:,0],pca_scores[:,1],s=0.5, c=y_train, cmap=cmap, vmin=vmin, vmax=vmax)
+    ax1.set(xlabel='PC1',ylabel='PC2')
+    ax2.scatter(pca_scores[:,0],pca_scores[:,2],s=0.5, c=y_train, cmap=cmap,vmin=vmin,vmax=vmax)
+    ax2.set(xlabel='PC1',ylabel='PC3')
+    ax3.scatter(x=pca_scores[:,1],y=pca_scores[:,2], s=0.5, c=y_train, cmap=cmap,vmin=vmin, vmax=vmax)
+    ax3.set(xlabel='PC2',ylabel='PC3')
+    plt.show()      
 
-    if ligandf==True and topological==True and morgan==True and macckeys==True:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,mo,ma,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,mo,ma,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,mo,ma,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,mo,ma,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,mo,ma,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,mo,ma,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,mo,ma,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==True and topological==True and morgan==True and macckeys==False:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,mo,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,mo,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,mo,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,mo,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,mo,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,mo,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,mo,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==True and topological==True and morgan==False and macckeys==True:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,ma,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,ma,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,ma,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,ma,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,ma,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,ma,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,ma,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==True and topological==False and morgan==True and macckeys==True:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,mo,ma,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,mo,ma,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,mo,ma,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,mo,ma,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([lf,mo,ma,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,mo,ma,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,mo,ma,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==False and topological==True and morgan==True and macckeys==True:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([tf,mo,ma,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([tf,mo,ma,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([tf,mo,ma,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([tf,mo,ma,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([tf,mo,ma,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([tf,mo,ma,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([tf,mo,ma,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==True and topological==True and morgan==False and macckeys==False:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,tf,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,tf,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==True and topological==False and morgan==True and macckeys==False:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,mo,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,mo,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,mo,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,mo,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([lf,mo,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,mo,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,mo,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==True and topological==False and morgan==False and macckeys==True:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,ma,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,ma,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,ma,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,ma,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([lf,ma,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,ma,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,ma,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==False and topological==True and morgan==True and macckeys==False:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([tf,mo,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([tf,mo,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([tf,mo,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([tf,mo,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([tf,mo,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([tf,mo,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([tf,mo,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==False and topological==True and morgan==False and macckeys==True:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([tf,ma,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([tf,ma,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([tf,ma,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([tf,ma,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([tf,ma,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([tf,ma,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([tf,ma,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==False and topological==False and morgan==True and macckeys==True:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([mo,ma,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([mo,ma,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([mo,ma,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([mo,ma,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([mo,ma,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([mo,ma,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([mo,ma,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==True and topological==False and morgan==False and macckeys==False:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([lf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([lf,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([lf,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([lf,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==False and topological==True and morgan==False and macckeys==False:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([tf,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([tf,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([tf,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([tf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([tf,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([tf,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([tf,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==False and topological==False and morgan==True and macckeys==False:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([mo,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([mo,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([mo,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([mo,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([mo,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([mo,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([mo,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==False and topological==False and morgan==False and macckeys==True:
-            if peptidef==True and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([ma,pf,wb,ac],axis=1)
-            elif peptidef==True and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([ma,pf,wb],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([ma,pf,ac],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==True:
-                all_features=np.concatenate([ma,wb,ac],axis=1)
-            elif peptidef==True and windowbased==False and autocorrelation==False:
-                all_features=np.concatenate([ma,pf],axis=1)
-            elif peptidef==False and windowbased==True and autocorrelation==False:
-                all_features=np.concatenate([ma,wb],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==True:
-                all_features=np.concatenate([ma,ac],axis=1)
-            elif peptidef==False and windowbased==False and autocorrelation==False:
-                raise RuntimeError("at least 1 peptide feature needs to be true")
-    elif ligandf==False and topological==False and morgan==False and macckeys==False:
-            raise RuntimeError("at least 1 ligand feature needs to be true")
-                        
-
-    matrix=all_features
-
-    return matrix,affinity
 
 def clipping_graph():
     data={1:{'0': 2.587978249229756, '1': 2.5874567472918493, '2': 2.5966800476026988, '3': 2.596145257346921, '4': 2.6005530103281043, '5': 2.604303509834665}, 
